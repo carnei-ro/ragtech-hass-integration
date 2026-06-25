@@ -1,0 +1,5 @@
+colorlog==6.10.1
+homeassistant==2025.2.4
+pip>=26.1.2
+pyserial==3.5
+ruff==0.15.19
