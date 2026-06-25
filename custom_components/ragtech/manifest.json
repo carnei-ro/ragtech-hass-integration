@@ -1,0 +1,15 @@
+{
+  "domain": "ragtech",
+  "name": "Ragtech UPS",
+  "codeowners": [
+    "@carnei-ro"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/carnei-ro/ragtech-hass-integration",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/carnei-ro/ragtech-hass-integration/issues",
+  "requirements": [
+    "pyserial==3.5"
+  ],
+  "version": "0.1.0"
+}

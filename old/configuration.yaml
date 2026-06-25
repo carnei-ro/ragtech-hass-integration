@@ -1,0 +1,118 @@
+shell_command:
+  get_ragtech_ups_metrics: "includes/shell_scripts/ragtech-ups.sh"
+
+template:
+  - trigger:
+      - trigger: time_pattern
+        seconds: "/30"
+    action:
+      - action: shell_command.get_ragtech_ups_metrics
+        response_variable: ups_data
+    sensor:
+      - name: "Ragtech UPS - Battery Charge"
+        unique_id: ragtech_ups_battery_charge
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["battery.charge"] }}
+
+      - name: "Ragtech UPS - Battery Voltage"
+        unique_id: ragtech_ups_battery_voltage
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["battery.voltage"] }}
+
+      - name: "Ragtech UPS - Battery Status"
+        unique_id: ragtech_ups_battery_status
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["battery.status"] }}
+
+      - name: "Ragtech UPS - Input Voltage"
+        unique_id: ragtech_ups_input_voltage
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["input.voltage"] }}
+
+      - name: "Ragtech UPS - Input Current"
+        unique_id: ragtech_ups_input_current
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["input.current"] }}
+
+      - name: "Ragtech UPS - Input Frequency"
+        unique_id: ragtech_ups_input_frequency
+        unit_of_measurement: "Hz"
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["input.frequency"] }}
+
+      - name: "Ragtech UPS - Output Voltage"
+        unique_id: ragtech_ups_output_voltage
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["output.voltage"] }}
+
+      - name: "Ragtech UPS - Output Current"
+        unique_id: ragtech_ups_output_current
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["output.current"] }}
+
+      - name: "Ragtech UPS - Output Power"
+        unique_id: ragtech_ups_output_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["output.power"] }}
+
+      - name: "Ragtech UPS - Output Apparent Power"
+        unique_id: ragtech_ups_output_apparent_power
+        unit_of_measurement: "VA"
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["output.apower"] }}
+
+      - name: "Ragtech UPS - Temperature"
+        unique_id: ragtech_ups_temperature
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["ups.temperature"] }}
+
+      - name: "Ragtech UPS - Load"
+        unique_id: ragtech_ups_load
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["ups.load"] }}
+
+      - name: "Ragtech UPS - Status"
+        unique_id: ragtech_ups_status
+        state: >
+          {% set d = ups_data.stdout | from_json %}
+          {{ d["ups.status"] }}
