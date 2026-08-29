@@ -16,4 +16,9 @@ CONF_TIMEOUT_DEFAULT_VALUE = 5
 CONF_POLLING_INTERVAL_KEY = "polling_interval"
 CONF_POLLING_INTERVAL_DEFAULT_VALUE = 30
 
+# UPS model key. Kept optional; missing entries default to the legacy Easy Pro
+# profile so existing installs keep working after upgrade.
+CONF_MODEL_KEY = "model"
+CONF_MODEL_DEFAULT_VALUE = "easy_pro"
+
 ENTITIES_SCAN_INTERVAL = timedelta(seconds=1)
