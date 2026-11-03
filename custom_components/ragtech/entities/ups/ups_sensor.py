@@ -143,11 +143,11 @@ class RagtechUpsSensor(SensorEntity):
             self._data = data
 
     @property
-    def state(self):
+    def native_value(self):
         return self._data.get(self._metric_key)
 
     @property
-    def unit_of_measurement(self):
+    def native_unit_of_measurement(self):
         return UPS_SENSOR_CONFIG[self._metric_key].get("unit")
 
     @property

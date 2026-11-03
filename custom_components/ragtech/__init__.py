@@ -1,5 +1,8 @@
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from homeassistant.helpers import config_validation as cv
 
 from .serial.client import RagtechSerialClient
 from .serial.client_manager import RagtechSerialClientManager
@@ -17,11 +20,14 @@ from .utils.const import (
     CONF_MODEL_DEFAULT_VALUE,
 )
 
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.config_entries import ConfigEntry
+
 PLATFORMS = ["sensor"]
 
-
-async def async_setup(_hass, _config):
-    return True
+# This integration is configured exclusively through config entries (UI).
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
