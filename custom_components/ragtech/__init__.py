@@ -13,6 +13,8 @@ from .utils.const import (
     CONF_TIMEOUT_DEFAULT_VALUE,
     CONF_POLLING_INTERVAL_KEY,
     CONF_POLLING_INTERVAL_DEFAULT_VALUE,
+    CONF_MODEL_KEY,
+    CONF_MODEL_DEFAULT_VALUE,
 )
 
 PLATFORMS = ["sensor"]
@@ -31,8 +33,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     polling_interval = config.get(
         CONF_POLLING_INTERVAL_KEY, CONF_POLLING_INTERVAL_DEFAULT_VALUE
     )
+    model = config.get(CONF_MODEL_KEY, CONF_MODEL_DEFAULT_VALUE)
 
-    client = RagtechSerialClient(serial_port, baud_rate, timeout)
+    client = RagtechSerialClient(serial_port, baud_rate, timeout, model=model)
     manager = RagtechSerialClientManager(client, polling_interval)
     manager.start(hass)
 
