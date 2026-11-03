@@ -48,8 +48,11 @@ The recommended installation method is via [HACS](https://hacs.xyz/):
 
 Notes:
 
-- Requires Home Assistant **2026.11** or newer. From that release on `pyserial` ships with
-  Home Assistant core, so the integration no longer declares it as a requirement.
+- Works on Home Assistant 2025.2 and newer. The manifest lists `pyserial-asyncio-fast` rather
+  than `pyserial` itself: Home Assistant 2026.11+ bundles `pyserial` and hassfest rejects custom
+  integrations that declare a core dependency, while older releases still need it installed.
+  `pyserial-asyncio-fast` is a thin wrapper that depends on `pyserial`, so listing it keeps
+  every supported release working.
 - HACS only installs the files; you still need to go to `Settings → Devices & Services` and add the integration manually.
 - For manual installation (advanced users), copy `custom_components/ragtech` to your Home Assistant `custom_components` directory.
 
