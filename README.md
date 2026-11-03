@@ -28,6 +28,18 @@ It talks to the UPS directly over serial (using [`pyserial`](https://pypi.org/pr
 | Load | % | UPS load |
 | Status | — | NUT-style status (`OL`, `OB`, `LB`, `RB` + `CHRG`/`DISCHRG`) |
 
+### Supported models
+
+| Model | Response header | Notes |
+| --- | --- | --- |
+| Easy Pro | `aa21` | Original, fully calibrated profile |
+| One UP 2000 Nitro TI | `aa09` | Calibration from the community thread, validated against a real device |
+
+During setup the integration probes the UPS once over serial and picks the matching
+profile automatically. If detection fails (port busy, no answer, unknown header) you are
+asked to pick the model manually. The model can also be changed later in the options
+dialog.
+
 ## Installation
 
 The recommended installation method is via [HACS](https://hacs.xyz/):
@@ -36,6 +48,8 @@ The recommended installation method is via [HACS](https://hacs.xyz/):
 
 Notes:
 
+- Requires Home Assistant **2026.11** or newer. From that release on `pyserial` ships with
+  Home Assistant core, so the integration no longer declares it as a requirement.
 - HACS only installs the files; you still need to go to `Settings → Devices & Services` and add the integration manually.
 - For manual installation (advanced users), copy `custom_components/ragtech` to your Home Assistant `custom_components` directory.
 

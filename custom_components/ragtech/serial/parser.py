@@ -33,7 +33,8 @@ def _read(hex_str, spec):
 
 
 def parse_data(data, model=MODEL_EASY_PRO):
-    """Parse a raw serial response from a Ragtech UPS.
+    """
+    Parse a raw serial response from a Ragtech UPS.
 
     `model` selects which calibration profile in ``UPS_MODELS`` to use.
     """
@@ -43,9 +44,11 @@ def parse_data(data, model=MODEL_EASY_PRO):
         return None
 
     hex_str = "".join(f"{byte:02x}" for byte in data)
-    expected_hex_len = profile["response_length"] * 2
+    # The UPS may deliver fewer bytes than ``response_length`` before the read
+    # timeout expires, so only require the bytes up to the last metric we read.
+    min_hex_len = max(profile[field][0] for field in _METRIC_FIELDS) * 2 + 2
 
-    if not (hex_str.startswith(profile["header"]) and len(hex_str) >= expected_hex_len):
+    if not (hex_str.startswith(profile["header"]) and len(hex_str) >= min_hex_len):
         _LOGGER.debug("[parse_data] unexpected response: %s", hex_str)
         return None
 

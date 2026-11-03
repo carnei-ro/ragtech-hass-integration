@@ -27,8 +27,10 @@ class Detection:
 
 
 def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
-    """Open the port, ask the UPS to talk, and match its header against
-    the model registry. Called from the config flow via an executor job.
+    """
+    Probe the UPS and match its response header against the model registry.
+
+    Called from the config flow via an executor job.
     """
     try:
         with serial.Serial(port, baud_rate, timeout=timeout) as ser:
@@ -54,7 +56,9 @@ def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
 
 
 class RagtechSerialClient:
-    def __init__(self, port: str, baud_rate: int, timeout: int, model: str = MODEL_EASY_PRO):
+    def __init__(
+        self, port: str, baud_rate: int, timeout: int, model: str = MODEL_EASY_PRO
+    ):
         self.port = port
         self.baud_rate = baud_rate
         self.timeout = timeout

@@ -1,7 +1,10 @@
 import asyncio
 from datetime import datetime
 
-from .client import RagtechSerialClient
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .client import RagtechSerialClient
 
 
 class RagtechSerialClientManager:
