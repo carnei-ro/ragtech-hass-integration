@@ -30,15 +30,15 @@ It talks to the UPS directly over serial (using [`pyserial`](https://pypi.org/pr
 
 ### Supported models
 
-| Model | Response header | Notes |
+| Model | Model code | Notes |
 | --- | --- | --- |
-| Easy Pro | `aa21` | Original, fully calibrated profile |
-| One UP 2000 Nitro TI | `aa09` | Calibration from the community thread, validated against a real device |
+| Easy Pro | `6` | Original, fully calibrated profile |
+| One UP 2000 Nitro TI | `16` | Calibration from the community thread, validated against a real device |
 
-During setup the integration probes the UPS once over serial and picks the matching
-profile automatically. If detection fails (port busy, no answer, unknown header) you are
-asked to pick the model manually. The model can also be changed later in the options
-dialog.
+During setup the integration probes the UPS once over serial and picks the profile
+matching the model code the UPS reports. If detection fails (port busy, no answer,
+unknown model code) you are asked to pick the model manually. The model can also be
+changed later in the options dialog.
 
 ## Installation
 
