@@ -12,6 +12,12 @@ REPLACE_BATTERY_CHARGE = 5
 # Relative input/output voltage delta above which the battery is discharging.
 DISCHARGE_VOLTAGE_DELTA = 0.10
 
+# A status frame is a start-of-frame byte plus a register dump: byte N holds
+# register 0x80 + N - 1, so byte 1 is data, not a header.
+FRAME_SOF = 0xAA
+# Register 0x9A: UPS model code.
+MODEL_CODE_OFFSET = 27
+
 # Fields whose raw values are (byte_offset, multiplier, additive_offset)
 # lookups inside a model profile.
 _METRIC_FIELDS = (
@@ -32,6 +38,25 @@ def _read(hex_str, spec):
     return raw * multiplier + additive
 
 
+def _is_frame(data, length):
+    return len(data) >= length and data[0] == FRAME_SOF
+
+
+def detect_model(data):
+    """Return the model key for a status frame, or None if unrecognised."""
+    # Easy Pro has no known model code; it is the only 64-byte profile.
+    if _is_frame(data, UPS_MODELS[MODEL_EASY_PRO]["response_length"]):
+        return MODEL_EASY_PRO
+    for key, profile in UPS_MODELS.items():
+        if (
+            "model_code" in profile
+            and _is_frame(data, profile["response_length"])
+            and data[MODEL_CODE_OFFSET] == profile["model_code"]
+        ):
+            return key
+    return None
+
+
 def parse_data(data, model=MODEL_EASY_PRO):
     """Parse a raw serial response from a Ragtech UPS.
 
@@ -43,9 +68,8 @@ def parse_data(data, model=MODEL_EASY_PRO):
         return None
 
     hex_str = "".join(f"{byte:02x}" for byte in data)
-    expected_hex_len = profile["response_length"] * 2
 
-    if not (hex_str.startswith(profile["header"]) and len(hex_str) >= expected_hex_len):
+    if not _is_frame(data, profile["response_length"]):
         _LOGGER.debug("[parse_data] unexpected response: %s", hex_str)
         return None
 

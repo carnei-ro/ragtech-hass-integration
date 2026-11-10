@@ -1,8 +1,9 @@
 """Per-model calibration profiles for supported Ragtech UPS units.
 
-Each profile carries the response framing (header + total byte length)
-and, for every metric, a `(byte_offset, multiplier, additive_offset)`
-tuple. The parser applies `value = raw * multiplier + additive_offset`.
+Each profile carries the expected status frame length, an optional model
+code (frame byte 27) used for auto-detection and, for every metric, a
+`(byte_offset, multiplier, additive_offset)` tuple. The parser applies
+`value = raw * multiplier + additive_offset`.
 
 Adding a new model = adding a new entry here; the parser, client, and
 config flow all derive their behavior from this table.
@@ -17,7 +18,6 @@ MODEL_ONE_UP_2000_NITRO_TI = "one_up_2000_nitro_ti"
 UPS_MODELS = {
     MODEL_EASY_PRO: {
         "label": "Easy Pro",
-        "header": "aa21",
         "response_length": 64,
         # metric key -> (byte offset, multiplier, additive offset)
         "battery_charge":  (0x08, 0.393, 0),
@@ -35,8 +35,8 @@ UPS_MODELS = {
         # (input mains, battery charge, output voltage all land on sensible
         # numbers for a 120 V install at 100% charge).
         "label": "One UP 2000 Nitro TI",
-        "header": "aa09",
         "response_length": 31,
+        "model_code": 0x10,
         "battery_charge":  (0x08, 0.392, 0),
         "battery_voltage": (0x0B, 0.0671, 0),
         "input_voltage":   (0x0C, 1.06, 0),
