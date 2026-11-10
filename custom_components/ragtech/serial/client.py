@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import serial
 
 from .models import MODEL_EASY_PRO, UPS_MODELS
-from .parser import parse_data
+from .parser import detect_model, parse_data
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +15,6 @@ REQUEST_COMMAND = bytes.fromhex("AA0400801E9E")
 # The UPS needs a short moment to answer after receiving the request.
 READ_DELAY = 2
 
-_HEADER_TO_MODEL = {profile["header"]: key for key, profile in UPS_MODELS.items()}
 _PROBE_READ_LEN = max(profile["response_length"] for profile in UPS_MODELS.values())
 
 
@@ -27,9 +26,7 @@ class Detection:
 
 
 def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
-    """Open the port, ask the UPS to talk, and match its header against
-    the model registry. Called from the config flow via an executor job.
-    """
+    """Read one status frame and detect the model (config flow executor job)."""
     try:
         with serial.Serial(port, baud_rate, timeout=timeout) as ser:
             ser.write(REQUEST_COMMAND)
@@ -43,11 +40,10 @@ def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
         return Detection(error=f"No response from UPS on {port}")
 
     raw_hex = response.hex()
-    header = raw_hex[:4]
-    model = _HEADER_TO_MODEL.get(header)
+    model = detect_model(response)
     if model is None:
         return Detection(
-            error=f"Unknown response header '{header}' (full response: {raw_hex})",
+            error=f"Unrecognised response ({len(response)} bytes): {raw_hex}",
             raw_hex=raw_hex,
         )
     return Detection(model=model, raw_hex=raw_hex)
