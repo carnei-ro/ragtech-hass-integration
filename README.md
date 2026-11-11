@@ -37,7 +37,7 @@ Estimated, not measured:
 | Sensor | Unit | How it is estimated |
 | --- | --- | --- |
 | Input Current | A | Output voltage × output current ÷ (input voltage × an assumed 60 % efficiency) |
-| Output Power | W | 1.3 × apparent power. A placeholder kept from earlier releases: real power cannot exceed apparent power |
+| Output Power | W | Output voltage × output current, which assumes a power factor of 1. The UPS does not report real power, so this is an upper bound |
 
 Output current and frequency need per-unit calibration values. The integration reads them
 from the UPS (registers `0x00F3`, `0x0202` and `0x0203`) when it starts and again after the
@@ -173,8 +173,9 @@ Decoding now follows Ragtech's own register map, so several values change:
 - Input Frequency became Output Frequency, which is what the UPS measures, and is scaled
   with the unit's calibration registers. An existing entity keeps its entity id and
   history.
-- Output Apparent Power is voltage × current. The 1.3 × estimate moved to Output Power:
-  the two had been swapped.
+- Output Apparent Power is voltage × current; it used to be 1.3 times that. Output Power
+  keeps its formula (voltage × current) and is now documented as an upper bound, because
+  the UPS reports no power factor.
 - The Easy Pro (code `6`) reads input voltage from the same register as every other
   model.
 - All 20 models of the family are supported, and the start byte of "Save Digital" units

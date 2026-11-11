@@ -136,12 +136,9 @@ def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
     output_voltage = round(values["output_voltage"])
     output_current = _round(values["output_current"], 2)
 
-    apparent_power = real_power = current_in = None
+    apparent_power = current_in = None
     if output_current is not None:
         apparent_power = round(output_voltage * output_current, 1)
-        # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
-        power_factor = 1.3
-        real_power = round(apparent_power * power_factor, 1)
         # Efficiency factor derived from multimeter readings and the official app.
         efficiency = 0.60
         current_in = 0.0
@@ -161,7 +158,8 @@ def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
         "output.voltage": output_voltage,
         "output.frequency": _round(values["output_frequency"], 2),
         "output.current": output_current,
-        "output.power": real_power,
+        # The UPS reports no power factor: the watts assume 1, an upper bound.
+        "output.power": apparent_power,
         "output.apower": apparent_power,
         "ups.temperature": values["temperature"],
         "ups.load": values["load"],
