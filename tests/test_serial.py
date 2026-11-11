@@ -67,7 +67,7 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
 @pytest.mark.parametrize(
     ("frame", "model", "expected"),
     [
-        (FRAME, MODEL_EASY_PRO, (100, 13.49, 198, 115, 0.24, 1, 54)),
+        (FRAME, MODEL_EASY_PRO, (100, 13.49, 199, 115, 0.24, 1, 54)),
         (FRAME, NITRO_TI, (100, 13.49, 199, 115, 0.23, 1, 54)),
         (NITRO_TI_FRAMES[0], NITRO_TI, (95, 13.49, 120, 110, 1.61, 11, 48)),
     ],

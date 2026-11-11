@@ -24,7 +24,7 @@ UPS_MODELS = {
         # metric key -> (byte offset, multiplier, additive offset)
         "battery_charge": (0x08, 0.393, 0),
         "battery_voltage": (0x0B, 0.0671, 0),  # was 0.1342 with a /2 downstream
-        "input_voltage": (0x1A, 1.06, 0),
+        "input_voltage": (0x0C, 1.06, 0),
         "output_current": (0x0D, 0.120, 0),
         "load": (0x0E, 1.0, 0),
         "temperature": (0x0F, 1.0, 0),
