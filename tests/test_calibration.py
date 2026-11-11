@@ -43,6 +43,10 @@ def test_read_requests_match_the_vendor_transport(address, count, request_hex):
     assert client.read_request(address, count) == bytes.fromhex(request_hex)
 
 
+def test_requests_carry_the_family_in_their_start_byte():
+    assert client.read_request(0x0080, 30, 13) == bytes.fromhex("AD0400801E9E")
+
+
 def test_calibration_is_read_once_at_setup():
     with FakeUps([POST_SWAP.frame], REGISTERS) as ups:
         ragtech = connect(ups)
@@ -143,4 +147,70 @@ def test_only_read_requests_reach_the_ups():
         ragtech.get_status()
         assert client.probe_ups_model(ups.port, 2560, 0.3).model is not None
         assert len(ups.requests) == 8
+        assert {request[1] for request in ups.requests} == {0x04}
+
+
+def hex_requests(ups):
+    return [request.hex() for request in ups.requests]
+
+
+def test_family_13_unit_is_addressed_with_its_own_start_byte():
+    with FakeUps([POST_SWAP.frame], REGISTERS, family=13) as ups:
+        ragtech = connect(ups)
+        # The first request assumes family 10 and is refused with 0xCD.
+        assert ragtech.get_status() is None
+        assert ragtech.last_frame == "cd"
+
+        data = ragtech.get_status()
+        assert ragtech.last_frame.startswith("ad")
+        assert data["battery.voltage"] == POST_SWAP.battery_voltage
+        assert data["output.current"] == POST_SWAP.output_current
+        assert ragtech.get_status() == data
+        assert hex_requests(ups) == [
+            "aa0400801e9e",
+            "ad0400801e9e",
+            "ad0400f301f4",
+            "ad0402020206",
+            "ad0400801e9e",
+        ]
+
+
+def test_probe_follows_a_family_13_refusal():
+    with FakeUps([POST_SWAP.frame], family=13) as ups:
+        detection = client.probe_ups_model(ups.port, 2560, 0.3)
+        assert detection.model == MODEL_ONE_UP_2000_NITRO_TI
+        assert hex_requests(ups) == ["aa0400801e9e", "ad0400801e9e"]
+
+
+def test_stray_refusal_does_not_strand_a_family_10_unit():
+    with FakeUps([POST_SWAP.frame], REGISTERS, replies={STATUS: b"\xcd"}) as ups:
+        ragtech = connect(ups)
+        assert ragtech.get_status() is None
+
+        # The family-13 request that follows is refused by the family-10 unit.
+        del ups.replies[STATUS]
+        assert ragtech.get_status() is None
+        assert ragtech.last_frame == "ca"
+        assert ragtech.get_status() is not None
+        assert [request[0] for request in ups.requests[:3]] == [0xAA, 0xAD, 0xAA]
+
+
+def test_silence_falls_back_to_the_default_family():
+    with FakeUps([POST_SWAP.frame], REGISTERS, family=13) as ups:
+        ragtech = connect(ups)
+        ragtech.get_status()
+        assert ragtech.get_status() is not None
+
+        ups.silent = True
+        assert ragtech.get_status() is None
+        ups.silent = False
+        assert ragtech.get_status() is None
+        assert ragtech.get_status() is not None
+        assert [request[0] for request in ups.requests[-5:]] == [
+            0xAD,
+            0xAA,
+            0xAD,
+            0xAD,
+            0xAD,
+        ]
         assert {request[1] for request in ups.requests} == {0x04}

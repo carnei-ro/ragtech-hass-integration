@@ -9,9 +9,9 @@ _LOGGER = logging.getLogger(__name__)
 # A status frame is a start byte plus a register dump: byte N holds register
 # 0x80 + N - 1, so byte 1 is data, not a header.
 FRAME_LENGTH = 31
-# Replies start with 0xA0 | family. Families 10 ("Easy") and 13 ("Save
-# Digital") share this protocol and register map.
-REPLY = 0xA0
+# Requests and replies start with 0xA0 | family. Families 10 ("Easy") and 13
+# ("Save Digital") share this protocol and register map.
+START = 0xA0
 FAMILIES = (10, 13)
 # A lone 0xC0 | family byte refuses the request.
 REFUSAL = 0xC0
@@ -49,7 +49,7 @@ NO_CALIBRATION = Calibration()
 
 def reply_family(data):
     """Return the family of the UPS that sent a reply, or None if it is not one."""
-    if data and data[0] & 0xF0 == REPLY and data[0] & 0x0F in FAMILIES:
+    if data and data[0] & 0xF0 == START and data[0] & 0x0F in FAMILIES:
         return data[0] & 0x0F
     return None
 

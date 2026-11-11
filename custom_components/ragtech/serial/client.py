@@ -6,6 +6,8 @@ import serial
 
 from .models import MODEL_EASY_PRO
 from .parser import (
+    FAMILIES,
+    START,
     Calibration,
     detect_model,
     is_frame,
@@ -16,8 +18,8 @@ from .parser import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Every request starts with 0xA0 | family; the "Easy" family is 10.
-START = 0xAA
+# The family addressed until the UPS names its own: 10, the "Easy" family.
+DEFAULT_FAMILY = 10
 # Read registers: the only opcode this integration ever sends.
 READ = 0x04
 
@@ -37,27 +39,37 @@ class Detection:
     raw_hex: str | None = None
 
 
-def read_request(address, count):
+def read_request(address, count, family=DEFAULT_FAMILY):
     """Build a read request; its checksum covers the address and the count."""
     high, low = address >> 8, address & 0xFF
-    return bytes([START, READ, high, low, count, (high + low + count) & 0xFF])
+    checksum = (high + low + count) & 0xFF
+    return bytes([START | family, READ, high, low, count, checksum])
 
 
-def _read(ser, address, count):
+def _read(ser, family, address, count):
     """Return the raw reply: a start byte plus `count` registers when all is well."""
     ser.reset_input_buffer()
-    ser.write(read_request(address, count))
+    ser.write(read_request(address, count, family))
     time.sleep(READ_DELAY)
     return ser.read(count + 1)
 
 
-def _request_status(ser):
-    return _read(ser, *STATUS)
+def _request_status(ser, family=DEFAULT_FAMILY):
+    return _read(ser, family, *STATUS)
 
 
-def _read_calibration_range(ser, address, count):
-    reply = _read(ser, address, count)
-    if len(reply) == count + 1 and reply_family(reply) is not None:
+def _named_family(reply):
+    """Return the family a status frame or a refusal names, else the default."""
+    if is_frame(reply) or is_refusal(reply):
+        family = reply[0] & 0x0F
+        if family in FAMILIES:
+            return family
+    return DEFAULT_FAMILY
+
+
+def _read_calibration_range(ser, family, address, count):
+    reply = _read(ser, family, address, count)
+    if len(reply) == count + 1 and reply_family(reply) == family:
         return reply[1:]
     _LOGGER.debug(
         "[calibration] read at 0x%04X %s: %s",
@@ -68,10 +80,10 @@ def _read_calibration_range(ser, address, count):
     return None
 
 
-def _read_calibration(ser):
-    (current,) = _read_calibration_range(ser, *CURRENT_CALIBRATION) or (None,)
-    osc53, osc57 = _read_calibration_range(ser, *FREQUENCY_CALIBRATION) or (None, None)
-    return Calibration(current, osc53, osc57)
+def _read_calibration(ser, family):
+    current = _read_calibration_range(ser, family, *CURRENT_CALIBRATION)
+    oscillator = _read_calibration_range(ser, family, *FREQUENCY_CALIBRATION)
+    return Calibration(*(current or (None,)), *(oscillator or (None, None)))
 
 
 def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
@@ -83,6 +95,10 @@ def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
     try:
         with serial.Serial(port, baud_rate, timeout=timeout) as ser:
             response = _request_status(ser)
+            family = _named_family(response)
+            if is_refusal(response) and family != DEFAULT_FAMILY:
+                # A unit of another family refused: ask again in its terms.
+                response = _request_status(ser, family)
     except Exception as exc:
         _LOGGER.debug("[probe_ups_model] serial error: %s", exc)
         return Detection(error=f"Could not open {port}: {exc}")
@@ -119,6 +135,7 @@ class RagtechSerialClient:
         self.calibration = Calibration()
         # Set at setup and by every failed poll: read the calibration again.
         self._calibration_due = True
+        self._family = DEFAULT_FAMILY
 
     def get_status(self):
         try:
@@ -129,14 +146,16 @@ class RagtechSerialClient:
                     self.baud_rate,
                     self.model,
                 )
-                response = _request_status(ser)
+                response = _request_status(ser, self._family)
                 self.last_frame = response.hex()
                 _LOGGER.debug("[get_status] frame: %s", self.last_frame)
 
+                # Address the UPS as the family its frame or refusal names.
+                self._family = _named_family(response)
                 if not is_frame(response):
                     self._calibration_due = True
                 elif self._calibration_due:
-                    self.calibration = _read_calibration(ser)
+                    self.calibration = _read_calibration(ser, self._family)
                     self._calibration_due = False
                     _LOGGER.debug("[get_status] %s", self.calibration)
 
@@ -148,4 +167,5 @@ class RagtechSerialClient:
         except Exception as e:
             _LOGGER.warning("[get_status] error: %s", e)
             self._calibration_due = True
+            self._family = DEFAULT_FAMILY
             return None
