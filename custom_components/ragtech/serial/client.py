@@ -71,11 +71,11 @@ def _read_calibration_range(ser, family, address, count):
     reply = _read(ser, family, address, count)
     if len(reply) == count + 1 and reply_family(reply) == family:
         return reply[1:]
-    _LOGGER.debug(
-        "[calibration] read at 0x%04X %s: %s",
+    _LOGGER.warning(
+        "[calibration] read at 0x%04X %s (%s); values that need it are unavailable",
         address,
-        "refused" if is_refusal(reply) else "got no usable reply",
-        reply.hex(),
+        "refused by the UPS" if is_refusal(reply) else "got no usable reply",
+        reply.hex() or "nothing received",
     )
     return None
 

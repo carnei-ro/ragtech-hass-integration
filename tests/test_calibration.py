@@ -87,11 +87,12 @@ def test_calibration_is_read_again_after_a_failed_poll_streak():
         assert data["output.current"] == 3.23
 
 
-def test_refused_read_leaves_that_calibration_unknown():
+def test_refused_read_leaves_that_calibration_unknown(caplog):
     with FakeUps([POST_SWAP.frame], REGISTERS, replies={CURRENT: REFUSAL}) as ups:
         ragtech = connect(ups)
         data = ragtech.get_status()
         assert ragtech.calibration == Calibration(None, 100, 72)
+        assert "read at 0x00F3 refused by the UPS (ca)" in caplog.text
         assert data["output.current"] is None
         assert data["output.power"] is None
         assert data["output.frequency"] == POST_SWAP.output_frequency
@@ -112,12 +113,13 @@ def test_short_reply_leaves_that_calibration_unknown():
         assert data["output.current"] == POST_SWAP.output_current
 
 
-def test_unanswered_calibration_leaves_both_unknown():
+def test_unanswered_calibration_leaves_both_unknown(caplog):
     with FakeUps([POST_SWAP.frame]) as ups:
         ups.replies = {CURRENT: b"", OSCILLATOR: b""}
         ragtech = connect(ups)
         data = ragtech.get_status()
         assert ragtech.calibration == Calibration()
+        assert "read at 0x0202 got no usable reply (nothing received)" in caplog.text
         assert data["output.current"] is None
         assert data["output.frequency"] is None
         assert data["battery.voltage"] == POST_SWAP.battery_voltage
