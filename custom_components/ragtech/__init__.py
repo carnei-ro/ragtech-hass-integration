@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 
 from .serial.client import RagtechSerialClient
@@ -59,6 +60,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     client = RagtechSerialClient(serial_port, baud_rate, timeout, model=model)
     manager = RagtechSerialClientManager(client, polling_interval)
+
+    # Entities are built from the first status frame: without one, let Home
+    # Assistant retry the setup rather than load an entry with no entities.
+    if not await manager.get_status():
+        msg = f"No status frame from the UPS on {serial_port}"
+        raise ConfigEntryNotReady(msg)
     manager.start(hass)
 
     if DOMAIN not in hass.data:

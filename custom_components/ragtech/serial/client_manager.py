@@ -46,10 +46,11 @@ class RagtechSerialClientManager:
         self._last_update = datetime.now()
 
     async def _updater(self):
+        # Setup has just polled: wait one interval before the next poll.
         while True:
+            await asyncio.sleep(self._polling_interval)
             async with self._lock:
                 await self._fetch_data()
-            await asyncio.sleep(self._polling_interval)
 
     async def get_status(self):
         async with self._lock:

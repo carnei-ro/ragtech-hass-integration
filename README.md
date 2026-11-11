@@ -185,6 +185,8 @@ Decoding now follows Ragtech's own register map, so several values change:
   is accepted.
 - Entities become unavailable after three unanswered polls. They used to keep their last
   values for as long as the UPS stayed silent.
+- If the UPS does not answer while Home Assistant starts, the setup is retried
+  automatically. It used to load without entities until the integration was reloaded.
 - New diagnostic sensors show the raw registers, the model code and the firmware version.
   The raw frame is logged at debug level and included in the diagnostics download.
 
