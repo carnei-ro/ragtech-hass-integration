@@ -169,7 +169,7 @@ class RagtechUpsSensor(SensorEntity):
     @property
     def available(self):
         # Values the UPS gave no calibration for are None.
-        return self.native_value is not None
+        return not self._manager.stale and self.native_value is not None
 
     @property
     def native_unit_of_measurement(self):

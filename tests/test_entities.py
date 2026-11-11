@@ -11,6 +11,9 @@ binary = pytest.importorskip("custom_components.ragtech.entities.ups.ups_binary_
 sensor = pytest.importorskip("custom_components.ragtech.entities.ups.ups_sensor")
 
 ENTRY = SimpleNamespace(entry_id="abc", data={"name": "Nobreak"}, options={})
+# Stand-ins for the client manager: the UPS answers, or has gone silent.
+FRESH = SimpleNamespace(stale=False)
+STALE = SimpleNamespace(stale=True)
 DATA = parse_data(POST_SWAP.frame, "one_up_2000_nitro_ti")
 
 
@@ -22,7 +25,7 @@ def test_every_sensor_reads_a_parsed_value():
 def test_raw_register_sensors_are_diagnostic():
     sensors = {
         entity.unique_id: entity
-        for entity in sensor.get_ups_sensors(None, ENTRY, None, DATA)
+        for entity in sensor.get_ups_sensors(None, ENTRY, FRESH, DATA)
     }
     register = sensors["ragtech_abc_ups_register_80_sensor"]
     assert register.native_value == "0x21"
@@ -35,7 +38,7 @@ def test_raw_register_sensors_are_diagnostic():
 def test_uncalibrated_sensors_exist_but_are_unavailable():
     sensors = {
         entity.unique_id: entity
-        for entity in sensor.get_ups_sensors(None, ENTRY, None, DATA)
+        for entity in sensor.get_ups_sensors(None, ENTRY, FRESH, DATA)
     }
     assert len(sensors) == len(sensor.UPS_SENSOR_CONFIG)
     assert DATA["output.current"] is None
@@ -51,10 +54,20 @@ def test_binary_sensor_reports_its_flag():
     data = dict.fromkeys(FLAGS, False) | {"battery.aged": True}
     sensors = {
         entity.unique_id: entity
-        for entity in binary.get_ups_binary_sensors(ENTRY, None, data)
+        for entity in binary.get_ups_binary_sensors(ENTRY, FRESH, data)
     }
     replace_battery = sensors["ragtech_abc_battery_aged_binary_sensor"]
     assert replace_battery.is_on
     assert replace_battery.name == "Nobreak Replace Battery"
     assert replace_battery.device_class == "problem"
     assert not sensors["ragtech_abc_battery_low_binary_sensor"].is_on
+
+
+def test_entities_are_unavailable_while_the_ups_is_silent():
+    silent = [
+        *sensor.get_ups_sensors(None, ENTRY, STALE, DATA),
+        *binary.get_ups_binary_sensors(ENTRY, STALE, DATA),
+    ]
+    assert not any(entity.available for entity in silent)
+    answering = binary.get_ups_binary_sensors(ENTRY, FRESH, DATA)
+    assert all(entity.available for entity in answering)

@@ -76,5 +76,9 @@ class RagtechUpsBinarySensor(BinarySensorEntity):
             self._data = data
 
     @property
+    def available(self):
+        return not self._manager.stale
+
+    @property
     def is_on(self):
         return self._data.get(self._flag_key)

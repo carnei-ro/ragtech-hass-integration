@@ -16,6 +16,9 @@ Every value comes from the UPS's status frame, decoded with the scales and flag 
 Ragtech's own Supervise software uses. The integration only ever sends read requests; it
 never writes to the UPS.
 
+If the UPS leaves three polls in a row unanswered, every entity becomes *unavailable*
+until it answers again, rather than keeping its last value.
+
 #### Sensors
 
 | Sensor | Unit | Where the value comes from |
@@ -180,6 +183,8 @@ Decoding now follows Ragtech's own register map, so several values change:
   model.
 - All 20 models of the family are supported, and the start byte of "Save Digital" units
   is accepted.
+- Entities become unavailable after three unanswered polls. They used to keep their last
+  values for as long as the UPS stayed silent.
 - New diagnostic sensors show the raw registers, the model code and the firmware version.
   The raw frame is logged at debug level and included in the diagnostics download.
 
