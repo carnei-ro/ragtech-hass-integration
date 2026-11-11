@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.config_entries import ConfigEntry
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "binary_sensor"]
 
 # This integration is configured exclusively through config entries (UI).
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
