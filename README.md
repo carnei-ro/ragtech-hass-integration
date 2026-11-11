@@ -28,7 +28,7 @@ until it answers again, rather than keeping its last value.
 | Battery Status | — | `DISCHARGING` while the UPS says it runs on battery. `CHARGING` is **inferred** (on mains with charge below 100 %), because the UPS has no charging flag. Otherwise `FULL` |
 | Input Voltage | V | Measured |
 | Output Voltage | V | Measured |
-| Output Current | A | Measured, scaled with the unit's calibration register |
+| Output Current | A | Measured, scaled with the unit's calibration register. It is half of what Ragtech's Supervise shows (see below) |
 | Output Frequency | Hz | Measured at the inverter, scaled with the unit's calibration registers. It equals the mains frequency while *Synchronised to Mains* is on |
 | Output Apparent Power | VA | Calculated: output voltage × output current |
 | Temperature | °C | Measured |
@@ -49,6 +49,11 @@ values cannot be used (a zero divisor), Output Current and Output Frequency are
 *unavailable* rather than guessed, and so are the three values calculated from the
 current (Output Apparent Power, Output Power and Input Current). A warning in the log
 says which read failed, and reloading the integration tries again.
+
+Supervise shows twice the output current that owners measure. A clamp meter and a
+known-load sweep on two One UP Nitro 2000 units, and a metering plug on an NEP 1200,
+all read half of the Supervise figure, so the integration publishes that half. Other
+models use the same rule untested.
 
 #### Binary sensors
 
@@ -171,8 +176,9 @@ Decoding now follows Ragtech's own register map, so several values change:
 - Status and Battery Status come from the UPS's own flags. `CHRG` and `DISCHRG` are gone
   from Status, and "input voltage above output voltage" no longer counts as charging.
 - New binary sensors for the UPS's flags, among them **Replace Battery**.
-- Output Current is scaled with the unit's calibration register, so its values change, and
-  with them Output Apparent Power, Output Power and Input Current.
+- Output Current is scaled with the unit's calibration register and is half of what
+  Supervise shows, which is what owners' meters read. Its values change, and with them
+  Output Apparent Power, Output Power and Input Current.
 - Input Frequency became Output Frequency, which is what the UPS measures, and is scaled
   with the unit's calibration registers. An existing entity keeps its entity id and
   history.

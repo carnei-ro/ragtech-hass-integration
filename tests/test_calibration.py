@@ -14,8 +14,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 STATUS, CURRENT, OSCILLATOR = 0x0080, 0x00F3, 0x0202
-# Made-up calibration values: no unit's real ones are known yet.
-REGISTERS = {0x00F3: 138, 0x0202: 100, 0x0203: 72}
+# The calibration the frame fixtures assume.
+REGISTERS = {0x00F3: 69, 0x0202: 100, 0x0203: 72}
 REFUSAL = b"\xca"
 
 
@@ -54,7 +54,7 @@ def test_calibration_is_read_once_at_setup():
             data = ragtech.get_status()
             assert data["output.current"] == POST_SWAP.output_current
             assert data["output.frequency"] == POST_SWAP.output_frequency
-        assert ragtech.calibration == Calibration(138, 100, 72)
+        assert ragtech.calibration == Calibration(69, 100, 72)
         assert ups.requests == [
             bytes.fromhex(request)
             for request in (
@@ -78,13 +78,13 @@ def test_calibration_is_read_again_after_a_failed_poll_streak():
         assert (ups.reads(CURRENT), ups.reads(OSCILLATOR)) == (1, 1)
 
         ups.silent = False
-        ups.registers[CURRENT] = 69
+        ups.registers[CURRENT] = 138
         assert ragtech.get_status() is not None
         data = ragtech.get_status()
         assert (ups.reads(CURRENT), ups.reads(OSCILLATOR)) == (2, 2)
-        assert ragtech.calibration == Calibration(69, 100, 72)
-        # Half the calibration byte doubles the current: 1.62 A became 3.23 A.
-        assert data["output.current"] == 3.23
+        assert ragtech.calibration == Calibration(138, 100, 72)
+        # Twice the calibration byte halves the current: 1.62 A became 0.81 A.
+        assert data["output.current"] == 0.81
 
 
 def test_refused_read_leaves_that_calibration_unknown(caplog):
@@ -108,7 +108,7 @@ def test_short_reply_leaves_that_calibration_unknown():
     ) as ups:
         ragtech = connect(ups)
         data = ragtech.get_status()
-        assert ragtech.calibration == Calibration(138, None, None)
+        assert ragtech.calibration == Calibration(69, None, None)
         assert data["output.frequency"] is None
         assert data["output.current"] == POST_SWAP.output_current
 

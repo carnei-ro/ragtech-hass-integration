@@ -6,14 +6,15 @@ The expected values come from running Ragtech's register definitions over each
 frame; `flags` lists Ragtech's own flag names that evaluate true.
 
 Output current and frequency also depend on calibration registers that are not
-part of a frame. No unit's real values are known, so those two columns assume
-the made-up `CALIBRATION` below.
+part of a frame, so those two columns assume the `CALIBRATION` below. Its
+current byte is close to the 70 to 72 that One UP 2000 owners have read. The
+current column is half of what Ragtech's software shows, as owners' meters do.
 """
 
 from typing import NamedTuple
 
 # Registers 0x00F3, 0x0202 and 0x0203.
-CALIBRATION = (138, 100, 72)
+CALIBRATION = (69, 100, 72)
 
 
 class VendorFrame(NamedTuple):

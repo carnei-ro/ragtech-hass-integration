@@ -126,6 +126,15 @@ def test_current_is_unknown_without_a_usable_calibration_byte(current):
     ("osc53", "osc57"), [(None, None), (100, None), (0, 0), (100, 100)]
 )
 def test_frequency_is_unknown_without_two_distinct_marks(osc53, osc57):
-    values = decode_frame(POST_SWAP.frame, NITRO_TI, Calibration(138, osc53, osc57))
+    values = decode_frame(POST_SWAP.frame, NITRO_TI, Calibration(69, osc53, osc57))
     assert values["output_frequency"] is None
     assert values["output_current"] is not None
+
+
+def test_current_is_half_of_what_the_vendor_software_shows():
+    # A One UP Nitro 2000 with calibration byte 72: Ragtech's software showed
+    # 2.21 A for a count of 10 where the owner's clamp meter read about 1.1 A.
+    raw = bytearray(POST_SWAP.frame)
+    raw[13] = 10
+    values = decode_frame(bytes(raw), NITRO_TI, Calibration(72, 98, 64))
+    assert values["output_current"] == pytest.approx(2.2125 / 2)

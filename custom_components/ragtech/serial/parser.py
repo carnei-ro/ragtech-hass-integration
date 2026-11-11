@@ -34,6 +34,9 @@ OUTPUT_VOLTAGE = 30  # register 0x9D
 # Scales every model shares.
 BATTERY_CHARGE_SCALE = 0.393
 INPUT_VOLTAGE_SCALE = 1.06
+# Ragtech's software divides the current by the calibration register alone.
+# Owners' meters on three units (model codes 6 and 16) read half of that.
+CURRENT_CALIBRATION_FACTOR = 2
 
 
 class Calibration(NamedTuple):
@@ -76,7 +79,11 @@ def _output_current(raw, model, calibration):
     # Without the unit's calibration byte the reading has no scale.
     if not calibration.current:
         return None
-    return raw * model.output_current_factor / calibration.current
+    return (
+        raw
+        * model.output_current_factor
+        / (CURRENT_CALIBRATION_FACTOR * calibration.current)
+    )
 
 
 def _output_frequency(raw, calibration):
