@@ -41,10 +41,11 @@ Estimated, not measured:
 
 Output current and frequency need per-unit calibration values. The integration reads them
 from the UPS (registers `0x00F3`, `0x0202` and `0x0203`) when it starts and again after the
-UPS has stopped answering. If the UPS refuses or does not answer those reads, Output
-Current and Output Frequency are *unavailable* rather than guessed, and so are the three
-values calculated from the current (Output Apparent Power, Output Power and Input
-Current). Reloading the integration tries again.
+UPS has stopped answering. If the UPS refuses or does not answer those reads, or the
+values cannot be used (a zero divisor), Output Current and Output Frequency are
+*unavailable* rather than guessed, and so are the three values calculated from the
+current (Output Apparent Power, Output Power and Input Current). A warning in the log
+says which read failed, and reloading the integration tries again.
 
 #### Binary sensors
 
