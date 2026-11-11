@@ -5,6 +5,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
     UnitOfApparentPower,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -102,6 +103,27 @@ UPS_SENSOR_CONFIG = {
         "name": "Status",
         "icon": "mdi:information-outline",
     },
+    "ups.model_code": {
+        "name": "Model Code",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.firmware": {
+        "name": "Firmware Version",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "battery.capacity_reference": {
+        "name": "Battery Capacity Reference",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.register_80": {
+        "name": "Register 0x80",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.settings": {
+        "name": "Settings Registers",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
 }
 
 
@@ -166,6 +188,10 @@ class RagtechUpsSensor(SensorEntity):
     @property
     def icon(self):
         return UPS_SENSOR_CONFIG[self._metric_key].get("icon")
+
+    @property
+    def entity_category(self):
+        return UPS_SENSOR_CONFIG[self._metric_key].get("entity_category")
 
     @property
     def unique_id(self):

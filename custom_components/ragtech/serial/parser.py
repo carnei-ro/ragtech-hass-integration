@@ -11,6 +11,9 @@ FRAME_SOF = 0xAA
 FRAME_LENGTH = 31
 
 # Status frame bytes the parser reads.
+NONVOLATILE_FLAGS = 1  # register 0x80
+SETTINGS = slice(1, 8)  # registers 0x80-0x86
+CAPACITY_REFERENCE = 4  # register 0x83
 BATTERY_CHARGE = 8  # register 0x87
 BATTERY_VOLTAGE = 11  # register 0x8A
 INPUT_VOLTAGE = 12  # register 0x8B
@@ -19,6 +22,7 @@ LOAD = 14  # register 0x8D
 TEMPERATURE = 15  # register 0x8E
 FREQUENCY = 24  # register 0x97
 MODEL_CODE = 27  # register 0x9A
+FIRMWARE = 28  # register 0x9B, in tenths
 OUTPUT_VOLTAGE = 30  # register 0x9D
 
 # Scales every model shares.
@@ -108,5 +112,12 @@ def parse_data(data, model=MODEL_EASY_PRO):
         "ups.temperature": values["temperature"],
         "ups.load": values["load"],
         "ups.status": ups_status(flags),
+        "ups.model_code": data[MODEL_CODE],
+        "ups.firmware": f"{data[FIRMWARE] / 10:.1f}",
+        "battery.capacity_reference": data[CAPACITY_REFERENCE],
+        # Raw registers, published as they are: bits 3 and 5 of 0x80 have no
+        # known meaning and must not be interpreted.
+        "ups.register_80": f"0x{data[NONVOLATILE_FLAGS]:02X}",
+        "ups.settings": data[SETTINGS].hex(" ").upper(),
         **flags,
     }

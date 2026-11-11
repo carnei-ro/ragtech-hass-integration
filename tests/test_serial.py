@@ -60,7 +60,10 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
     flipped = with_byte(frame, 1, 0x21 if frame[1] == 0x09 else 0x09)
     data = parse_data(frame, model)
     assert data is not None
-    assert parse_data(flipped, model) == data
+    changed = {
+        key for key, value in parse_data(flipped, model).items() if value != data[key]
+    }
+    assert changed == {"ups.register_80", "ups.settings"}
     assert detect_model(frame) == model
     assert detect_model(flipped) == model
 
@@ -77,6 +80,17 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
 def test_known_values(frame, model, expected):
     data = parse_data(frame, model)
     assert tuple(data[key] for key in DECODED_KEYS) == expected
+
+
+def test_raw_registers_are_published_as_they_are():
+    before = parse_data(PRE_SWAP.frame, NITRO_TI)
+    after = parse_data(POST_SWAP.frame, NITRO_TI)
+    assert before["ups.register_80"] == "0x09"
+    assert before["ups.settings"] == "09 00 0C 5B 00 01 0B"
+    assert before["battery.capacity_reference"] == 0x5B
+    assert after["ups.register_80"] == "0x21"
+    assert after["ups.settings"] == "21 00 0C 00 00 00 14"
+    assert after["battery.capacity_reference"] == 0
 
 
 def test_pre_swap_frame_asks_for_a_battery_replacement():

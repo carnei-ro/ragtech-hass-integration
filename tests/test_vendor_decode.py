@@ -38,7 +38,10 @@ def test_frames_decode_like_the_vendor(vendor):
     assert values["load"] == vendor.load
     assert values["temperature"] == vendor.temperature
 
-    assert parse_data(vendor.frame, key)["battery.voltage"] == vendor.battery_voltage
+    data = parse_data(vendor.frame, key)
+    assert data["battery.voltage"] == vendor.battery_voltage
+    assert data["ups.model_code"] == vendor.model
+    assert data["ups.firmware"] == vendor.firmware
 
 
 def test_table_holds_the_twenty_family_10_models():
