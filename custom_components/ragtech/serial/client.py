@@ -128,7 +128,7 @@ class RagtechSerialClient:
                     self._calibration_due = False
                     _LOGGER.debug("[get_status] %s", self.calibration)
 
-                parsed = parse_data(response, self.model)
+                parsed = parse_data(response, self.model, self.calibration)
                 if parsed:
                     self.last_data = parsed
                 _LOGGER.debug("[get_status] data: %s", parsed)

@@ -9,8 +9,12 @@ from custom_components.ragtech.serial.models import (
     MODEL_ONE_UP_2000_NITRO_TI as NITRO_TI,
     UPS_MODELS,
 )
-from custom_components.ragtech.serial.parser import detect_model, parse_data
-from vendor_frames import FRAMES, POST_SWAP, PRE_SWAP
+from custom_components.ragtech.serial.parser import (
+    Calibration,
+    detect_model,
+    parse_data,
+)
+from vendor_frames import CALIBRATION, FRAMES, POST_SWAP, PRE_SWAP
 
 # Senoidal Puro 1200VA, mains OK (issue #27): byte 1 = 0x09, model code 6.
 SENOIDAL_FRAMES = [
@@ -71,14 +75,14 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
 @pytest.mark.parametrize(
     ("frame", "model", "expected"),
     [
-        (FRAME, MODEL_EASY_PRO, (100, 13.47, 199, 115, 0.24, 1, 54)),
+        (FRAME, MODEL_EASY_PRO, (100, 13.47, 199, 115, 0.09, 1, 54)),
         (FRAME, NITRO_TI, (100, 26.93, 199, 115, 0.23, 1, 54)),
-        (NITRO_TI_FRAMES[0], NITRO_TI, (95, 26.93, 120, 110, 1.61, 11, 48)),
+        (NITRO_TI_FRAMES[0], NITRO_TI, (95, 26.93, 120, 110, 1.62, 11, 48)),
     ],
     ids=["senoidal-easy_pro", "senoidal-nitro_ti", "nitro_ti-nitro_ti"],
 )
 def test_known_values(frame, model, expected):
-    data = parse_data(frame, model)
+    data = parse_data(frame, model, Calibration(*CALIBRATION))
     assert tuple(data[key] for key in DECODED_KEYS) == expected
 
 

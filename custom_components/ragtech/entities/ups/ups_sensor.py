@@ -131,8 +131,6 @@ def get_ups_sensors(hass, entry, manager, data):
     device_info = get_device_info(entry)
     sensors = []
     for metric_key in UPS_SENSOR_CONFIG:
-        if data.get(metric_key) is None:
-            continue
         sensors.append(
             RagtechUpsSensor(
                 hass,
@@ -167,6 +165,11 @@ class RagtechUpsSensor(SensorEntity):
     @property
     def native_value(self):
         return self._data.get(self._metric_key)
+
+    @property
+    def available(self):
+        # Values the UPS gave no calibration for are None.
+        return self.native_value is not None
 
     @property
     def native_unit_of_measurement(self):

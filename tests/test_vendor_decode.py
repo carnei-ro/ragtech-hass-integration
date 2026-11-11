@@ -6,12 +6,23 @@ from custom_components.ragtech.serial.models import (
     UPS_MODELS,
 )
 from custom_components.ragtech.serial.parser import (
+    Calibration,
     decode_frame,
     detect_model,
     parse_data,
 )
 from custom_components.ragtech.utils.const import CONF_MODEL_DEFAULT_VALUE
-from vendor_frames import FRAMES, POST_SWAP
+from vendor_frames import CALIBRATION, FRAMES, POST_SWAP
+
+NITRO_TI = UPS_MODELS[MODEL_ONE_UP_2000_NITRO_TI]
+# Keys that need the UPS's calibration registers.
+CALIBRATED_KEYS = (
+    "input.current",
+    "input.frequency",
+    "output.current",
+    "output.power",
+    "output.apower",
+)
 
 # Output current factors as the research report groups them: model codes -> factors.
 CURRENT_FACTORS = {
@@ -28,7 +39,7 @@ def test_frames_decode_like_the_vendor(vendor):
     model = UPS_MODELS[key]
     assert model.code == vendor.model
 
-    values = decode_frame(vendor.frame, model)
+    values = decode_frame(vendor.frame, model, Calibration(*CALIBRATION))
     assert values["battery_voltage"] == pytest.approx(vendor.battery_voltage, abs=0.005)
     assert values["battery_charge"] == pytest.approx(
         min(vendor.battery_charge, 100), abs=0.05
@@ -37,6 +48,10 @@ def test_frames_decode_like_the_vendor(vendor):
     assert values["output_voltage"] == pytest.approx(vendor.output_voltage, abs=0.05)
     assert values["load"] == vendor.load
     assert values["temperature"] == vendor.temperature
+    assert values["output_current"] == pytest.approx(vendor.output_current, abs=0.005)
+    assert values["output_frequency"] == pytest.approx(
+        vendor.output_frequency, abs=0.005
+    )
 
     data = parse_data(vendor.frame, key)
     assert data["battery.voltage"] == vendor.battery_voltage
@@ -75,3 +90,32 @@ def test_manual_model_choice_overrides_the_reported_code():
     assert POST_SWAP.model == 16
     assert parse_data(POST_SWAP.frame, "easy_pro")["battery.voltage"] == 13.47
     assert parse_data(POST_SWAP.frame, "model_17")["output.voltage"] == 204
+
+
+def test_current_and_frequency_need_the_calibration_registers():
+    data = parse_data(POST_SWAP.frame, MODEL_ONE_UP_2000_NITRO_TI)
+    assert [data[key] for key in CALIBRATED_KEYS] == [None] * len(CALIBRATED_KEYS)
+    assert data["output.voltage"] == 110
+
+    data = parse_data(
+        POST_SWAP.frame, MODEL_ONE_UP_2000_NITRO_TI, Calibration(*CALIBRATION)
+    )
+    assert None not in [data[key] for key in CALIBRATED_KEYS]
+    assert data["output.current"] == 1.62
+    assert data["input.frequency"] == 60.02
+
+
+@pytest.mark.parametrize("current", [None, 0])
+def test_current_is_unknown_without_a_usable_calibration_byte(current):
+    values = decode_frame(POST_SWAP.frame, NITRO_TI, Calibration(current, 100, 72))
+    assert values["output_current"] is None
+    assert values["output_frequency"] is not None
+
+
+@pytest.mark.parametrize(
+    ("osc53", "osc57"), [(None, None), (100, None), (0, 0), (100, 100)]
+)
+def test_frequency_is_unknown_without_two_distinct_marks(osc53, osc57):
+    values = decode_frame(POST_SWAP.frame, NITRO_TI, Calibration(138, osc53, osc57))
+    assert values["output_frequency"] is None
+    assert values["output_current"] is not None

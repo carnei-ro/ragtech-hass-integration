@@ -32,6 +32,17 @@ def test_raw_register_sensors_are_diagnostic():
     assert sensors["ragtech_abc_battery_voltage_sensor"].entity_category is None
 
 
+def test_uncalibrated_sensors_exist_but_are_unavailable():
+    sensors = {
+        entity.unique_id: entity
+        for entity in sensor.get_ups_sensors(None, ENTRY, None, DATA)
+    }
+    assert len(sensors) == len(sensor.UPS_SENSOR_CONFIG)
+    assert DATA["output.current"] is None
+    assert not sensors["ragtech_abc_output_current_sensor"].available
+    assert sensors["ragtech_abc_output_voltage_sensor"].available
+
+
 def test_every_flag_has_a_binary_sensor():
     assert set(binary.UPS_BINARY_SENSOR_CONFIG) == set(FLAGS)
 

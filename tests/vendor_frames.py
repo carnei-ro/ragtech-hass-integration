@@ -4,9 +4,16 @@ Public status frames with the values Ragtech's own software decodes from them.
 The frames were posted by their owners (forum threads, issues, repositories).
 The expected values come from running Ragtech's register definitions over each
 frame; `flags` lists Ragtech's own flag names that evaluate true.
+
+Output current and frequency also depend on calibration registers that are not
+part of a frame. No unit's real values are known, so those two columns assume
+the made-up `CALIBRATION` below.
 """
 
 from typing import NamedTuple
+
+# Registers 0x00F3, 0x0202 and 0x0203.
+CALIBRATION = (138, 100, 72)
 
 
 class VendorFrame(NamedTuple):
@@ -20,6 +27,8 @@ class VendorFrame(NamedTuple):
     output_voltage: float
     load: int
     temperature: int
+    output_current: float
+    output_frequency: float
     flags: tuple[str, ...]
 
     @property
@@ -39,6 +48,8 @@ FRAMES = (
         111.0,
         11,
         45,
+        1.62,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -52,6 +63,8 @@ FRAMES = (
         111.0,
         12,
         45,
+        1.73,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -65,6 +78,8 @@ FRAMES = (
         109.9,
         11,
         48,
+        1.62,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -78,6 +93,8 @@ FRAMES = (
         109.9,
         11,
         48,
+        1.62,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -91,6 +108,8 @@ FRAMES = (
         109.9,
         12,
         48,
+        1.73,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -104,6 +123,8 @@ FRAMES = (
         109.9,
         11,
         48,
+        1.50,
+        60.02,
         ("syncInput",),
     ),
     VendorFrame(
@@ -117,6 +138,8 @@ FRAMES = (
         115.4,
         1,
         54,
+        0.09,
+        58.76,
         ("syncInput",),
     ),
     VendorFrame(
@@ -130,6 +153,8 @@ FRAMES = (
         116.0,
         2,
         54,
+        0.14,
+        58.76,
         ("syncInput",),
     ),
     VendorFrame(
@@ -143,6 +168,8 @@ FRAMES = (
         115.4,
         2,
         54,
+        0.14,
+        58.76,
         ("syncInput",),
     ),
     VendorFrame(
@@ -156,6 +183,8 @@ FRAMES = (
         118.2,
         42,
         47,
+        5.54,
+        61.70,
         ("syncInput",),
     ),
     VendorFrame(
@@ -169,6 +198,8 @@ FRAMES = (
         118.2,
         41,
         47,
+        5.66,
+        61.70,
         ("syncInput",),
     ),
     VendorFrame(
@@ -182,6 +213,8 @@ FRAMES = (
         115.4,
         47,
         48,
+        6.23,
+        61.56,
         ("noVInput", "opBattery"),
     ),
     VendorFrame(
@@ -195,6 +228,8 @@ FRAMES = (
         119.9,
         6,
         61,
+        0.28,
+        60.72,
         ("syncInput",),
     ),
     VendorFrame(
@@ -208,6 +243,8 @@ FRAMES = (
         121.0,
         10,
         55,
+        1.39,
+        60.02,
         ("lessBattery", "oldBattery", "syncInput"),
     ),
     VendorFrame(
@@ -221,6 +258,8 @@ FRAMES = (
         112.1,
         11,
         44,
+        1.73,
+        61.00,
         ("syncInput",),
     ),
     VendorFrame(
@@ -234,6 +273,8 @@ FRAMES = (
         114.9,
         10,
         44,
+        1.27,
+        61.28,
         ("noVInput", "opBattery"),
     ),
     VendorFrame(
@@ -247,6 +288,8 @@ FRAMES = (
         116.0,
         9,
         53,
+        0.42,
+        63.94,
         ("syncInput",),
     ),
     VendorFrame(
@@ -260,6 +303,8 @@ FRAMES = (
         114.9,
         13,
         58,
+        0.51,
+        64.36,
         ("noVInput", "opBattery"),
     ),
     VendorFrame(
@@ -273,6 +318,8 @@ FRAMES = (
         115.4,
         13,
         65,
+        0.51,
+        64.36,
         ("noVInput", "opBattery"),
     ),
     VendorFrame(
@@ -286,6 +333,8 @@ FRAMES = (
         116.0,
         9,
         66,
+        0.42,
+        63.94,
         ("syncInput",),
     ),
     VendorFrame(
@@ -299,6 +348,8 @@ FRAMES = (
         109.9,
         32,
         47,
+        0.97,
+        61.00,
         ("lessBattery", "syncInput"),
     ),
     VendorFrame(
@@ -312,6 +363,8 @@ FRAMES = (
         119.3,
         14,
         48,
+        2.03,
+        58.90,
         ("syncInput",),
     ),
     VendorFrame(
@@ -325,6 +378,8 @@ FRAMES = (
         106.6,
         13,
         41,
+        1.96,
+        59.60,
         ("syncInput",),
     ),
 )

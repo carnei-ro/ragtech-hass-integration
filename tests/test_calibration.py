@@ -46,7 +46,9 @@ def test_calibration_is_read_once_at_setup():
     with FakeUps([POST_SWAP.frame], REGISTERS) as ups:
         ragtech = connect(ups)
         for _ in range(3):
-            assert ragtech.get_status() is not None
+            data = ragtech.get_status()
+            assert data["output.current"] == POST_SWAP.output_current
+            assert data["input.frequency"] == POST_SWAP.output_frequency
         assert ragtech.calibration == Calibration(138, 100, 72)
         assert ups.requests == [
             bytes.fromhex(request)
@@ -71,20 +73,26 @@ def test_calibration_is_read_again_after_a_failed_poll_streak():
         assert (ups.reads(CURRENT), ups.reads(OSCILLATOR)) == (1, 1)
 
         ups.silent = False
-        ups.registers[CURRENT] = 71
+        ups.registers[CURRENT] = 69
         assert ragtech.get_status() is not None
-        assert ragtech.get_status() is not None
+        data = ragtech.get_status()
         assert (ups.reads(CURRENT), ups.reads(OSCILLATOR)) == (2, 2)
-        assert ragtech.calibration == Calibration(71, 100, 72)
+        assert ragtech.calibration == Calibration(69, 100, 72)
+        # Half the calibration byte doubles the current: 1.62 A became 3.23 A.
+        assert data["output.current"] == 3.23
 
 
 def test_refused_read_leaves_that_calibration_unknown():
     with FakeUps([POST_SWAP.frame], REGISTERS, replies={CURRENT: REFUSAL}) as ups:
         ragtech = connect(ups)
-        assert ragtech.get_status() is not None
+        data = ragtech.get_status()
         assert ragtech.calibration == Calibration(None, 100, 72)
+        assert data["output.current"] is None
+        assert data["output.power"] is None
+        assert data["input.frequency"] == POST_SWAP.output_frequency
+        assert data["output.voltage"] == 110
         # A refusal is not retried until the link has failed.
-        assert ragtech.get_status() is not None
+        assert ragtech.get_status() == data
         assert (ups.reads(CURRENT), ups.reads(OSCILLATOR)) == (1, 1)
 
 
@@ -93,8 +101,21 @@ def test_short_reply_leaves_that_calibration_unknown():
         [POST_SWAP.frame], REGISTERS, replies={OSCILLATOR: b"\xaa\x64"}
     ) as ups:
         ragtech = connect(ups)
-        assert ragtech.get_status() is not None
+        data = ragtech.get_status()
         assert ragtech.calibration == Calibration(138, None, None)
+        assert data["input.frequency"] is None
+        assert data["output.current"] == POST_SWAP.output_current
+
+
+def test_unanswered_calibration_leaves_both_unknown():
+    with FakeUps([POST_SWAP.frame]) as ups:
+        ups.replies = {CURRENT: b"", OSCILLATOR: b""}
+        ragtech = connect(ups)
+        data = ragtech.get_status()
+        assert ragtech.calibration == Calibration()
+        assert data["output.current"] is None
+        assert data["input.frequency"] is None
+        assert data["battery.voltage"] == POST_SWAP.battery_voltage
 
 
 def test_only_read_requests_reach_the_ups():

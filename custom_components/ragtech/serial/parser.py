@@ -23,7 +23,7 @@ INPUT_VOLTAGE = 12  # register 0x8B
 OUTPUT_CURRENT = 13  # register 0x8C
 LOAD = 14  # register 0x8D
 TEMPERATURE = 15  # register 0x8E
-FREQUENCY = 24  # register 0x97
+OUTPUT_FREQUENCY = 24  # register 0x97, the inverter oscillator count
 MODEL_CODE = 27  # register 0x9A
 FIRMWARE = 28  # register 0x9B, in tenths
 OUTPUT_VOLTAGE = 30  # register 0x9D
@@ -32,10 +32,6 @@ OUTPUT_VOLTAGE = 30  # register 0x9D
 BATTERY_CHARGE_SCALE = 0.393
 INPUT_VOLTAGE_SCALE = 1.06
 
-# Fixed current scales of the two original profiles, keyed by model code. The
-# other models have none: their current needs the UPS's calibration register.
-CURRENT_SCALE = {6: 0.120, 16: 0.1152}
-
 
 class Calibration(NamedTuple):
     """Per-unit calibration registers; None where the UPS provided no value."""
@@ -43,6 +39,9 @@ class Calibration(NamedTuple):
     current: int | None = None  # register 0x00F3
     osc53: int | None = None  # register 0x0202
     osc57: int | None = None  # register 0x0203
+
+
+NO_CALIBRATION = Calibration()
 
 
 def is_frame(data):
@@ -63,23 +62,46 @@ def detect_model(data):
     return None
 
 
-def decode_frame(data, model):
+def _output_current(raw, model, calibration):
+    # Without the unit's calibration byte the reading has no scale.
+    if not calibration.current:
+        return None
+    return raw * model.output_current_factor / calibration.current
+
+
+def _output_frequency(raw, calibration):
+    # The oscillator count is interpolated between its 53 Hz and 57 Hz marks.
+    osc53, osc57 = calibration.osc53, calibration.osc57
+    if osc53 is None or osc57 is None or osc53 == osc57:
+        return None
+    return (53 + 4 * (raw - osc53) / (osc57 - osc53)) * 0.9806 + 1.46
+
+
+def decode_frame(data, model, calibration=NO_CALIBRATION):
     """Scale the registers of a status frame the way Ragtech's software does."""
     return {
         "battery_charge": min(data[BATTERY_CHARGE] * BATTERY_CHARGE_SCALE, FULL_CHARGE),
         "battery_voltage": data[BATTERY_VOLTAGE] * model.battery_voltage_scale,
         "input_voltage": data[INPUT_VOLTAGE] * INPUT_VOLTAGE_SCALE,
         "output_voltage": data[OUTPUT_VOLTAGE] * model.output_voltage_scale,
+        "output_current": _output_current(data[OUTPUT_CURRENT], model, calibration),
+        "output_frequency": _output_frequency(data[OUTPUT_FREQUENCY], calibration),
         "load": data[LOAD],
         "temperature": data[TEMPERATURE],
     }
 
 
-def parse_data(data, model=MODEL_EASY_PRO):
+def _round(value, digits):
+    return None if value is None else round(value, digits)
+
+
+def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
     """
     Parse a raw serial response from a Ragtech UPS.
 
-    `model` is the key of the ``UPS_MODELS`` row to decode with.
+    `model` is the key of the ``UPS_MODELS`` row to decode with. Output current
+    and frequency, and the values derived from them, are None when
+    `calibration` lacks the registers they need.
     """
     profile = UPS_MODELS.get(model)
     if profile is None:
@@ -90,15 +112,14 @@ def parse_data(data, model=MODEL_EASY_PRO):
         _LOGGER.debug("[parse_data] unexpected response: %s", data.hex())
         return None
 
-    values = decode_frame(data, profile)
+    values = decode_frame(data, profile, calibration)
     battery_charge = round(values["battery_charge"])
     input_voltage = round(values["input_voltage"])
     output_voltage = round(values["output_voltage"])
-    frequency = round(65 - 0.1152 * data[FREQUENCY], 2)
+    output_current = _round(values["output_current"], 2)
 
-    output_current = apparent_power = real_power = current_in = None
-    if profile.code in CURRENT_SCALE:
-        output_current = round(data[OUTPUT_CURRENT] * CURRENT_SCALE[profile.code], 2)
+    apparent_power = real_power = current_in = None
+    if output_current is not None:
         apparent_power = round(output_voltage * output_current, 1)
         # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
         power_factor = 1.3
@@ -119,7 +140,7 @@ def parse_data(data, model=MODEL_EASY_PRO):
         "battery.status": battery_status(flags, battery_charge),
         "input.voltage": input_voltage,
         "input.current": current_in,
-        "input.frequency": frequency,
+        "input.frequency": _round(values["output_frequency"], 2),
         "output.voltage": output_voltage,
         "output.current": output_current,
         "output.power": apparent_power,
