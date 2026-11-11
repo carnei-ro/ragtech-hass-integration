@@ -164,6 +164,20 @@ def test_invalid_frames_rejected(frame):
 STATUS_REQUEST = bytes.fromhex("AA0400801E9E")
 
 
+def test_family_13_start_byte_is_accepted():
+    frame = with_byte(NITRO_TI_FRAMES[0], 0, 0xAD)
+    assert detect_model(frame) == NITRO_TI
+    assert parse_data(frame, NITRO_TI) == parse_data(NITRO_TI_FRAMES[0], NITRO_TI)
+
+
+@pytest.mark.parametrize(("refusal", "family"), [(b"\xca", 10), (b"\xcd", 13)])
+def test_lone_refusal_byte_is_reported(refusal, family, caplog):
+    caplog.set_level(logging.DEBUG)
+    assert parse_data(refusal, NITRO_TI) is None
+    assert detect_model(refusal) is None
+    assert f"(family {family}) refused the request: {refusal.hex()}" in caplog.text
+
+
 class FakeSerial:
     """Answers the status request with `response` and nothing else."""
 
@@ -252,3 +266,10 @@ def test_probe_unknown_model_falls_back_to_manual_pick(fake_serial):
     assert detection.model is None
     assert detection.error == f"Unrecognised response (31 bytes): {frame.hex()}"
     assert detection.raw_hex == frame.hex()
+
+
+def test_probe_reports_a_refusal(fake_serial):
+    fake_serial(b"\xca")
+    detection = client.probe_ups_model("/dev/null", 2560, 5)
+    assert detection.model is None
+    assert detection.error == "UPS refused the request (1 bytes): ca"

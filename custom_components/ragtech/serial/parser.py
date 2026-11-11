@@ -6,11 +6,14 @@ from .models import MODEL_EASY_PRO, UPS_MODELS
 
 _LOGGER = logging.getLogger(__name__)
 
-# A status frame is a start-of-frame byte plus a register dump: byte N holds
-# register 0x80 + N - 1, so byte 1 is data, not a header.
-FRAME_SOF = 0xAA
+# A status frame is a start byte plus a register dump: byte N holds register
+# 0x80 + N - 1, so byte 1 is data, not a header.
 FRAME_LENGTH = 31
-# High nibble of the lone byte the UPS sends to refuse a request.
+# Replies start with 0xA0 | family. Families 10 ("Easy") and 13 ("Save
+# Digital") share this protocol and register map.
+REPLY = 0xA0
+FAMILIES = (10, 13)
+# A lone 0xC0 | family byte refuses the request.
 REFUSAL = 0xC0
 
 # Status frame bytes the parser reads.
@@ -44,8 +47,15 @@ class Calibration(NamedTuple):
 NO_CALIBRATION = Calibration()
 
 
+def reply_family(data):
+    """Return the family of the UPS that sent a reply, or None if it is not one."""
+    if data and data[0] & 0xF0 == REPLY and data[0] & 0x0F in FAMILIES:
+        return data[0] & 0x0F
+    return None
+
+
 def is_frame(data):
-    return len(data) >= FRAME_LENGTH and data[0] == FRAME_SOF
+    return len(data) >= FRAME_LENGTH and reply_family(data) is not None
 
 
 def is_refusal(data):
@@ -106,6 +116,14 @@ def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
     profile = UPS_MODELS.get(model)
     if profile is None:
         _LOGGER.debug("[parse_data] unknown model: %s", model)
+        return None
+
+    if is_refusal(data):
+        _LOGGER.debug(
+            "[parse_data] the UPS (family %d) refused the request: %s",
+            data[0] & 0x0F,
+            data.hex(),
+        )
         return None
 
     if not is_frame(data):

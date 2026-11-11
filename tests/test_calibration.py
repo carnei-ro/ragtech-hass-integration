@@ -1,3 +1,4 @@
+import logging
 import sys
 
 import pytest
@@ -12,7 +13,7 @@ pytestmark = pytest.mark.skipif(
     not sys.platform.startswith("linux"), reason="needs a Linux pseudo-terminal"
 )
 
-CURRENT, OSCILLATOR = 0x00F3, 0x0202
+STATUS, CURRENT, OSCILLATOR = 0x0080, 0x00F3, 0x0202
 # Made-up calibration values: no unit's real ones are known yet.
 REGISTERS = {0x00F3: 138, 0x0202: 100, 0x0203: 72}
 REFUSAL = b"\xca"
@@ -116,6 +117,20 @@ def test_unanswered_calibration_leaves_both_unknown():
         assert data["output.current"] is None
         assert data["output.frequency"] is None
         assert data["battery.voltage"] == POST_SWAP.battery_voltage
+
+
+def test_refused_status_read_is_a_failed_poll(caplog):
+    caplog.set_level(logging.DEBUG)
+    with FakeUps([POST_SWAP.frame], REGISTERS, replies={STATUS: REFUSAL}) as ups:
+        ragtech = connect(ups)
+        assert ragtech.get_status() is None
+        assert ragtech.last_frame == "ca"
+        assert "(family 10) refused the request: ca" in caplog.text
+        assert ups.reads(CURRENT) == 0
+
+        del ups.replies[STATUS]
+        assert ragtech.get_status() is not None
+        assert ups.reads(CURRENT) == 1
 
 
 def test_only_read_requests_reach_the_ups():

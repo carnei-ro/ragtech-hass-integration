@@ -5,7 +5,14 @@ from dataclasses import dataclass
 import serial
 
 from .models import MODEL_EASY_PRO
-from .parser import Calibration, detect_model, is_frame, is_refusal, parse_data
+from .parser import (
+    Calibration,
+    detect_model,
+    is_frame,
+    is_refusal,
+    parse_data,
+    reply_family,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +57,7 @@ def _request_status(ser):
 
 def _read_calibration_range(ser, address, count):
     reply = _read(ser, address, count)
-    if len(reply) == count + 1 and reply[0] == START:
+    if len(reply) == count + 1 and reply_family(reply) is not None:
         return reply[1:]
     _LOGGER.debug(
         "[calibration] read at 0x%04X %s: %s",
@@ -86,8 +93,13 @@ def probe_ups_model(port: str, baud_rate: int, timeout: int) -> Detection:
     raw_hex = response.hex()
     model = detect_model(response)
     if model is None:
+        reason = (
+            "UPS refused the request"
+            if is_refusal(response)
+            else "Unrecognised response"
+        )
         return Detection(
-            error=f"Unrecognised response ({len(response)} bytes): {raw_hex}",
+            error=f"{reason} ({len(response)} bytes): {raw_hex}",
             raw_hex=raw_hex,
         )
     return Detection(model=model, raw_hex=raw_hex)
