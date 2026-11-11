@@ -78,6 +78,7 @@ class RagtechSerialClient:
                     self.model,
                 )
                 response = _request_status(ser)
+                _LOGGER.debug("[get_status] frame: %s", response.hex())
 
                 parsed = parse_data(response, self.model)
                 if parsed:

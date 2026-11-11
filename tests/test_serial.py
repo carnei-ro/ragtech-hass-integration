@@ -1,3 +1,4 @@
+import logging
 from contextlib import nullcontext
 
 import pytest
@@ -185,6 +186,13 @@ def test_get_status_reads_one_31_byte_frame(fake_serial, model):
     ups = client.RagtechSerialClient("/dev/null", 2560, 5, model=model)
     assert ups.get_status() == parse_data(FRAME, model)
     assert port.calls == EXPECTED_CALLS
+
+
+def test_get_status_logs_the_raw_frame(fake_serial, caplog):
+    fake_serial(FRAME)
+    caplog.set_level(logging.DEBUG)
+    client.RagtechSerialClient("/dev/null", 2560, 5).get_status()
+    assert f"frame: {FRAME.hex()}" in caplog.text
 
 
 @pytest.mark.parametrize(
