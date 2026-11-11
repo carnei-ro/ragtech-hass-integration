@@ -105,6 +105,16 @@ def test_current_and_frequency_need_the_calibration_registers():
     assert data["output.frequency"] == 60.02
 
 
+def test_apparent_power_is_volts_times_amps():
+    data = parse_data(
+        POST_SWAP.frame, MODEL_ONE_UP_2000_NITRO_TI, Calibration(*CALIBRATION)
+    )
+    assert (data["output.voltage"], data["output.current"]) == (110, 1.62)
+    assert data["output.apower"] == 178.2
+    # The watt figure is the old 1.3 x estimate, not a measurement.
+    assert data["output.power"] == 231.7
+
+
 @pytest.mark.parametrize("current", [None, 0])
 def test_current_is_unknown_without_a_usable_calibration_byte(current):
     values = decode_frame(POST_SWAP.frame, NITRO_TI, Calibration(current, 100, 72))
