@@ -157,20 +157,27 @@ def test_invalid_frames_rejected(frame):
     assert detect_model(frame) is None
 
 
+STATUS_REQUEST = bytes.fromhex("AA0400801E9E")
+
+
 class FakeSerial:
+    """Answers the status request with `response` and nothing else."""
+
     def __init__(self, response):
         self.response = response
         self.calls = []
+        self.reply = b""
 
     def reset_input_buffer(self):
         self.calls.append("reset_input_buffer")
 
     def write(self, data):
         self.calls.append(("write", data))
+        self.reply = self.response if data == STATUS_REQUEST else b""
 
     def read(self, size):
         self.calls.append(("read", size))
-        return self.response[:size]
+        return self.reply[:size]
 
 
 @pytest.fixture
@@ -189,8 +196,16 @@ def fake_serial(monkeypatch):
 
 EXPECTED_CALLS = [
     "reset_input_buffer",
-    ("write", bytes.fromhex("AA0400801E9E")),
+    ("write", STATUS_REQUEST),
     ("read", 31),
+]
+CALIBRATION_CALLS = [
+    "reset_input_buffer",
+    ("write", bytes.fromhex("AA0400F301F4")),
+    ("read", 2),
+    "reset_input_buffer",
+    ("write", bytes.fromhex("AA0402020206")),
+    ("read", 3),
 ]
 
 
@@ -199,7 +214,9 @@ def test_get_status_reads_one_31_byte_frame(fake_serial, model):
     port = fake_serial(FRAME)
     ups = client.RagtechSerialClient("/dev/null", 2560, 5, model=model)
     assert ups.get_status() == parse_data(FRAME, model)
-    assert port.calls == EXPECTED_CALLS
+    assert port.calls == EXPECTED_CALLS + CALIBRATION_CALLS
+    assert ups.get_status() == parse_data(FRAME, model)
+    assert port.calls == EXPECTED_CALLS + CALIBRATION_CALLS + EXPECTED_CALLS
 
 
 def test_get_status_logs_and_keeps_the_raw_frame(fake_serial, caplog):

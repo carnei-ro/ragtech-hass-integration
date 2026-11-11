@@ -1,4 +1,5 @@
 import logging
+from typing import NamedTuple
 
 from .flags import FULL_CHARGE, battery_status, decode_flags, ups_status
 from .models import MODEL_EASY_PRO, UPS_MODELS
@@ -9,6 +10,8 @@ _LOGGER = logging.getLogger(__name__)
 # register 0x80 + N - 1, so byte 1 is data, not a header.
 FRAME_SOF = 0xAA
 FRAME_LENGTH = 31
+# High nibble of the lone byte the UPS sends to refuse a request.
+REFUSAL = 0xC0
 
 # Status frame bytes the parser reads.
 NONVOLATILE_FLAGS = 1  # register 0x80
@@ -34,13 +37,25 @@ INPUT_VOLTAGE_SCALE = 1.06
 CURRENT_SCALE = {6: 0.120, 16: 0.1152}
 
 
-def _is_frame(data):
+class Calibration(NamedTuple):
+    """Per-unit calibration registers; None where the UPS provided no value."""
+
+    current: int | None = None  # register 0x00F3
+    osc53: int | None = None  # register 0x0202
+    osc57: int | None = None  # register 0x0203
+
+
+def is_frame(data):
     return len(data) >= FRAME_LENGTH and data[0] == FRAME_SOF
+
+
+def is_refusal(data):
+    return len(data) == 1 and data[0] & 0xF0 == REFUSAL
 
 
 def detect_model(data):
     """Return the model key for a status frame, or None if unrecognised."""
-    if not _is_frame(data):
+    if not is_frame(data):
         return None
     for key, model in UPS_MODELS.items():
         if data[MODEL_CODE] == model.code:
@@ -71,7 +86,7 @@ def parse_data(data, model=MODEL_EASY_PRO):
         _LOGGER.debug("[parse_data] unknown model: %s", model)
         return None
 
-    if not _is_frame(data):
+    if not is_frame(data):
         _LOGGER.debug("[parse_data] unexpected response: %s", data.hex())
         return None
 
