@@ -1,6 +1,6 @@
 import logging
 
-from .flags import battery_status, decode_flags, ups_status
+from .flags import FULL_CHARGE, battery_status, decode_flags, ups_status
 from .models import MODEL_EASY_PRO, UPS_MODELS
 
 _LOGGER = logging.getLogger(__name__)
@@ -8,91 +8,95 @@ _LOGGER = logging.getLogger(__name__)
 # A status frame is a start-of-frame byte plus a register dump: byte N holds
 # register 0x80 + N - 1, so byte 1 is data, not a header.
 FRAME_SOF = 0xAA
-# Register 0x9A: UPS model code.
-MODEL_CODE_OFFSET = 27
+FRAME_LENGTH = 31
 
-# Fields whose raw values are (byte_offset, multiplier, additive_offset)
-# lookups inside a model profile.
-_METRIC_FIELDS = (
-    "battery_charge",
-    "battery_voltage",
-    "input_voltage",
-    "output_current",
-    "load",
-    "temperature",
-    "frequency",
-    "output_voltage",
-)
+# Status frame bytes the parser reads.
+BATTERY_CHARGE = 8  # register 0x87
+BATTERY_VOLTAGE = 11  # register 0x8A
+INPUT_VOLTAGE = 12  # register 0x8B
+OUTPUT_CURRENT = 13  # register 0x8C
+LOAD = 14  # register 0x8D
+TEMPERATURE = 15  # register 0x8E
+FREQUENCY = 24  # register 0x97
+MODEL_CODE = 27  # register 0x9A
+OUTPUT_VOLTAGE = 30  # register 0x9D
+
+# Scales every model shares.
+BATTERY_CHARGE_SCALE = 0.393
+INPUT_VOLTAGE_SCALE = 1.06
+
+# Fixed current scales of the two original profiles, keyed by model code. The
+# other models have none: their current needs the UPS's calibration register.
+CURRENT_SCALE = {6: 0.120, 16: 0.1152}
 
 
-def _read(hex_str, spec):
-    offset, multiplier, additive = spec
-    raw = int(hex_str[offset * 2 : offset * 2 + 2], 16)
-    return raw * multiplier + additive
-
-
-def _is_frame(data, profile):
-    # Only require the bytes up to the last metric we read.
-    min_len = max(profile[field][0] for field in _METRIC_FIELDS) + 1
-    return len(data) >= min_len and data[0] == FRAME_SOF
+def _is_frame(data):
+    return len(data) >= FRAME_LENGTH and data[0] == FRAME_SOF
 
 
 def detect_model(data):
     """Return the model key for a status frame, or None if unrecognised."""
-    for key, profile in UPS_MODELS.items():
-        if (
-            _is_frame(data, profile)
-            and data[MODEL_CODE_OFFSET] == profile["model_code"]
-        ):
+    if not _is_frame(data):
+        return None
+    for key, model in UPS_MODELS.items():
+        if data[MODEL_CODE] == model.code:
             return key
     return None
+
+
+def decode_frame(data, model):
+    """Scale the registers of a status frame the way Ragtech's software does."""
+    return {
+        "battery_charge": min(data[BATTERY_CHARGE] * BATTERY_CHARGE_SCALE, FULL_CHARGE),
+        "battery_voltage": data[BATTERY_VOLTAGE] * model.battery_voltage_scale,
+        "input_voltage": data[INPUT_VOLTAGE] * INPUT_VOLTAGE_SCALE,
+        "output_voltage": data[OUTPUT_VOLTAGE] * model.output_voltage_scale,
+        "load": data[LOAD],
+        "temperature": data[TEMPERATURE],
+    }
 
 
 def parse_data(data, model=MODEL_EASY_PRO):
     """
     Parse a raw serial response from a Ragtech UPS.
 
-    `model` selects which calibration profile in ``UPS_MODELS`` to use.
+    `model` is the key of the ``UPS_MODELS`` row to decode with.
     """
     profile = UPS_MODELS.get(model)
     if profile is None:
         _LOGGER.debug("[parse_data] unknown model: %s", model)
         return None
 
-    hex_str = "".join(f"{byte:02x}" for byte in data)
-
-    if not _is_frame(data, profile):
-        _LOGGER.debug("[parse_data] unexpected response: %s", hex_str)
+    if not _is_frame(data):
+        _LOGGER.debug("[parse_data] unexpected response: %s", data.hex())
         return None
 
-    values = {field: _read(hex_str, profile[field]) for field in _METRIC_FIELDS}
-
+    values = decode_frame(data, profile)
     battery_charge = round(values["battery_charge"])
-    battery_voltage = round(values["battery_voltage"], 2)
     input_voltage = round(values["input_voltage"])
-    output_current = round(values["output_current"], 2)
-    load = round(values["load"])
-    temperature = round(values["temperature"])
-    frequency = round(values["frequency"], 2)
     output_voltage = round(values["output_voltage"])
+    frequency = round(65 - 0.1152 * data[FREQUENCY], 2)
+
+    output_current = apparent_power = real_power = current_in = None
+    if profile.code in CURRENT_SCALE:
+        output_current = round(data[OUTPUT_CURRENT] * CURRENT_SCALE[profile.code], 2)
+        apparent_power = round(output_voltage * output_current, 1)
+        # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
+        power_factor = 1.3
+        real_power = round(apparent_power * power_factor, 1)
+        # Efficiency factor derived from multimeter readings and the official app.
+        efficiency = 0.60
+        current_in = 0.0
+        if input_voltage > 0:
+            current_in = round(
+                (output_voltage * output_current) / (input_voltage * efficiency), 2
+            )
 
     flags = decode_flags(data)
 
-    apparent_power = round(output_voltage * output_current, 1)
-    # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
-    power_factor = 1.3
-    real_power = round(apparent_power * power_factor, 1)
-    # Efficiency factor derived from multimeter readings and the official app.
-    efficiency = 0.60
-    current_in = 0.0
-    if input_voltage > 0:
-        current_in = round(
-            (output_voltage * output_current) / (input_voltage * efficiency), 2
-        )
-
     return {
         "battery.charge": battery_charge,
-        "battery.voltage": battery_voltage,
+        "battery.voltage": round(values["battery_voltage"], 2),
         "battery.status": battery_status(flags, battery_charge),
         "input.voltage": input_voltage,
         "input.current": current_in,
@@ -101,8 +105,8 @@ def parse_data(data, model=MODEL_EASY_PRO):
         "output.current": output_current,
         "output.power": apparent_power,
         "output.apower": real_power,
-        "ups.temperature": temperature,
-        "ups.load": load,
+        "ups.temperature": values["temperature"],
+        "ups.load": values["load"],
         "ups.status": ups_status(flags),
         **flags,
     }

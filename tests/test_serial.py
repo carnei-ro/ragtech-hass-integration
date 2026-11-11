@@ -67,9 +67,9 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
 @pytest.mark.parametrize(
     ("frame", "model", "expected"),
     [
-        (FRAME, MODEL_EASY_PRO, (100, 13.49, 199, 115, 0.24, 1, 54)),
-        (FRAME, NITRO_TI, (100, 13.49, 199, 115, 0.23, 1, 54)),
-        (NITRO_TI_FRAMES[0], NITRO_TI, (95, 13.49, 120, 110, 1.61, 11, 48)),
+        (FRAME, MODEL_EASY_PRO, (100, 13.47, 199, 115, 0.24, 1, 54)),
+        (FRAME, NITRO_TI, (100, 26.93, 199, 115, 0.23, 1, 54)),
+        (NITRO_TI_FRAMES[0], NITRO_TI, (95, 26.93, 120, 110, 1.61, 11, 48)),
     ],
     ids=["senoidal-easy_pro", "senoidal-nitro_ti", "nitro_ti-nitro_ti"],
 )
@@ -110,7 +110,10 @@ def test_input_above_output_does_not_mean_charging():
     assert data["battery.status"] == "FULL"
 
 
-@pytest.mark.parametrize(("code", "model"), [(6, MODEL_EASY_PRO), (16, NITRO_TI)])
+@pytest.mark.parametrize(
+    ("code", "model"),
+    [(6, MODEL_EASY_PRO), (16, NITRO_TI), (0, "model_0"), (19, "model_19")],
+)
 def test_detect_model_by_code(code, model):
     assert detect_model(with_byte(FRAME, 27, code)) == model
 
