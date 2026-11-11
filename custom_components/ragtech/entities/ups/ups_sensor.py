@@ -51,19 +51,19 @@ UPS_SENSOR_CONFIG = {
         "state_class": SensorStateClass.MEASUREMENT,
         "icon": "mdi:current-ac",
     },
-    "input.frequency": {
-        "name": "Input Frequency",
-        "unit": UnitOfFrequency.HERTZ,
-        "device_class": SensorDeviceClass.FREQUENCY,
-        "state_class": SensorStateClass.MEASUREMENT,
-        "icon": "mdi:sine-wave",
-    },
     "output.voltage": {
         "name": "Output Voltage",
         "unit": UnitOfElectricPotential.VOLT,
         "device_class": SensorDeviceClass.VOLTAGE,
         "state_class": SensorStateClass.MEASUREMENT,
         "icon": "mdi:flash",
+    },
+    "output.frequency": {
+        "name": "Output Frequency",
+        "unit": UnitOfFrequency.HERTZ,
+        "device_class": SensorDeviceClass.FREQUENCY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "icon": "mdi:sine-wave",
     },
     "output.current": {
         "name": "Output Current",

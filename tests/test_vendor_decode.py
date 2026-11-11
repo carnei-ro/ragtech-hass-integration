@@ -18,7 +18,7 @@ NITRO_TI = UPS_MODELS[MODEL_ONE_UP_2000_NITRO_TI]
 # Keys that need the UPS's calibration registers.
 CALIBRATED_KEYS = (
     "input.current",
-    "input.frequency",
+    "output.frequency",
     "output.current",
     "output.power",
     "output.apower",
@@ -102,7 +102,7 @@ def test_current_and_frequency_need_the_calibration_registers():
     )
     assert None not in [data[key] for key in CALIBRATED_KEYS]
     assert data["output.current"] == 1.62
-    assert data["input.frequency"] == 60.02
+    assert data["output.frequency"] == 60.02
 
 
 @pytest.mark.parametrize("current", [None, 0])

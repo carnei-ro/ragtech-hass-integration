@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 
 from .serial.client import RagtechSerialClient
 from .serial.client_manager import RagtechSerialClientManager
+from .utils.migration import migrated_unique_id
 from .utils.const import (
     DOMAIN,
     CONF_SERIAL_PORT_KEY,
@@ -30,6 +31,21 @@ PLATFORMS = ["sensor", "binary_sensor"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
+async def _async_migrate_unique_ids(hass: HomeAssistant, entry: ConfigEntry):
+    registry = er.async_get(hass)
+
+    def migrate(entity):
+        unique_id = migrated_unique_id(entity.unique_id)
+        # Leave the entity alone if its new unique id is already taken.
+        if unique_id is None or registry.async_get_entity_id(
+            entity.domain, entity.platform, unique_id
+        ):
+            return None
+        return {"new_unique_id": unique_id}
+
+    await er.async_migrate_entries(hass, entry.entry_id, migrate)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     config = {**entry.data, **entry.options}
 
@@ -52,6 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "manager": manager,
     }
 
+    await _async_migrate_unique_ids(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

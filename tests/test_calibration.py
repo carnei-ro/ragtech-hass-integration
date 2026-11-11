@@ -48,7 +48,7 @@ def test_calibration_is_read_once_at_setup():
         for _ in range(3):
             data = ragtech.get_status()
             assert data["output.current"] == POST_SWAP.output_current
-            assert data["input.frequency"] == POST_SWAP.output_frequency
+            assert data["output.frequency"] == POST_SWAP.output_frequency
         assert ragtech.calibration == Calibration(138, 100, 72)
         assert ups.requests == [
             bytes.fromhex(request)
@@ -89,7 +89,7 @@ def test_refused_read_leaves_that_calibration_unknown():
         assert ragtech.calibration == Calibration(None, 100, 72)
         assert data["output.current"] is None
         assert data["output.power"] is None
-        assert data["input.frequency"] == POST_SWAP.output_frequency
+        assert data["output.frequency"] == POST_SWAP.output_frequency
         assert data["output.voltage"] == 110
         # A refusal is not retried until the link has failed.
         assert ragtech.get_status() == data
@@ -103,7 +103,7 @@ def test_short_reply_leaves_that_calibration_unknown():
         ragtech = connect(ups)
         data = ragtech.get_status()
         assert ragtech.calibration == Calibration(138, None, None)
-        assert data["input.frequency"] is None
+        assert data["output.frequency"] is None
         assert data["output.current"] == POST_SWAP.output_current
 
 
@@ -114,7 +114,7 @@ def test_unanswered_calibration_leaves_both_unknown():
         data = ragtech.get_status()
         assert ragtech.calibration == Calibration()
         assert data["output.current"] is None
-        assert data["input.frequency"] is None
+        assert data["output.frequency"] is None
         assert data["battery.voltage"] == POST_SWAP.battery_voltage
 
 
