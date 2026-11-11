@@ -20,7 +20,9 @@ from .utils.const import (
 
 
 def _model_choices():
-    return {key: prof["label"] for key, prof in UPS_MODELS.items()}
+    return {
+        key: f"{model.label} (code {model.code})" for key, model in UPS_MODELS.items()
+    }
 
 
 class RagtechConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -93,7 +95,7 @@ class RagtechConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(_config_entry):
         return RagtechConfigFlowOptionsFlowHandler()
 
 

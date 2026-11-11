@@ -5,6 +5,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
     UnitOfApparentPower,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -50,19 +51,19 @@ UPS_SENSOR_CONFIG = {
         "state_class": SensorStateClass.MEASUREMENT,
         "icon": "mdi:current-ac",
     },
-    "input.frequency": {
-        "name": "Input Frequency",
-        "unit": UnitOfFrequency.HERTZ,
-        "device_class": SensorDeviceClass.FREQUENCY,
-        "state_class": SensorStateClass.MEASUREMENT,
-        "icon": "mdi:sine-wave",
-    },
     "output.voltage": {
         "name": "Output Voltage",
         "unit": UnitOfElectricPotential.VOLT,
         "device_class": SensorDeviceClass.VOLTAGE,
         "state_class": SensorStateClass.MEASUREMENT,
         "icon": "mdi:flash",
+    },
+    "output.frequency": {
+        "name": "Output Frequency",
+        "unit": UnitOfFrequency.HERTZ,
+        "device_class": SensorDeviceClass.FREQUENCY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "icon": "mdi:sine-wave",
     },
     "output.current": {
         "name": "Output Current",
@@ -102,6 +103,27 @@ UPS_SENSOR_CONFIG = {
         "name": "Status",
         "icon": "mdi:information-outline",
     },
+    "ups.model_code": {
+        "name": "Model Code",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.firmware": {
+        "name": "Firmware Version",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "battery.capacity_reference": {
+        "name": "Battery Capacity Reference",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.register_80": {
+        "name": "Register 0x80",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
+    "ups.settings": {
+        "name": "Settings Registers",
+        "entity_category": EntityCategory.DIAGNOSTIC,
+    },
 }
 
 
@@ -109,8 +131,6 @@ def get_ups_sensors(hass, entry, manager, data):
     device_info = get_device_info(entry)
     sensors = []
     for metric_key in UPS_SENSOR_CONFIG:
-        if data.get(metric_key) is None:
-            continue
         sensors.append(
             RagtechUpsSensor(
                 hass,
@@ -143,11 +163,16 @@ class RagtechUpsSensor(SensorEntity):
             self._data = data
 
     @property
-    def state(self):
+    def native_value(self):
         return self._data.get(self._metric_key)
 
     @property
-    def unit_of_measurement(self):
+    def available(self):
+        # Values the UPS gave no calibration for are None.
+        return not self._manager.stale and self.native_value is not None
+
+    @property
+    def native_unit_of_measurement(self):
         return UPS_SENSOR_CONFIG[self._metric_key].get("unit")
 
     @property
@@ -166,6 +191,10 @@ class RagtechUpsSensor(SensorEntity):
     @property
     def icon(self):
         return UPS_SENSOR_CONFIG[self._metric_key].get("icon")
+
+    @property
+    def entity_category(self):
+        return UPS_SENSOR_CONFIG[self._metric_key].get("entity_category")
 
     @property
     def unique_id(self):

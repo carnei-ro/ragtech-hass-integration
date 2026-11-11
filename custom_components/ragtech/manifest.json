@@ -9,7 +9,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/carnei-ro/ragtech-hass-integration/issues",
   "requirements": [
-    "pyserial==3.5"
+    "pyserial-asyncio-fast>=0.16"
   ],
-  "version": "0.1.2"
+  "version": "0.3.0"
 }
