@@ -94,7 +94,8 @@ def test_refused_read_leaves_that_calibration_unknown(caplog):
         assert ragtech.calibration == Calibration(None, 100, 72)
         assert "read at 0x00F3 refused by the UPS (ca)" in caplog.text
         assert data["output.current"] is None
-        assert data["output.power"] is None
+        assert data["output.apower"] is None
+        assert data["output.power"] == 154.0
         assert data["output.frequency"] == POST_SWAP.output_frequency
         assert data["output.voltage"] == 110
         # A refusal is not retried until the link has failed.

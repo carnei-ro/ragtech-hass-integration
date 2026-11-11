@@ -31,6 +31,7 @@ until it answers again, rather than keeping its last value.
 | Output Current | A | Measured, scaled with the unit's calibration register. It is half of what Ragtech's Supervise shows (see below) |
 | Output Frequency | Hz | Measured at the inverter, scaled with the unit's calibration registers. It equals the mains frequency while *Synchronised to Mains* is on |
 | Output Apparent Power | VA | Calculated: output voltage × output current |
+| Output Power | W | One UP 2000 Nitro TI (code `16`): the UPS's load figure × its rated 1400 W, in steps of 14 W. Other models: output voltage × output current, which assumes a power factor of 1 and is an upper bound |
 | Temperature | °C | Measured |
 | Load | % | Measured by the UPS |
 | Status | — | NUT-style, built from the UPS's own flags: `OL` or `OB`, followed by `LB` (battery low), `RB` (battery aged or missing), `OVER` (overload fault) and `ALARM` (any fault) when they apply |
@@ -40,20 +41,39 @@ Estimated, not measured:
 | Sensor | Unit | How it is estimated |
 | --- | --- | --- |
 | Input Current | A | Output voltage × output current ÷ (input voltage × an assumed 60 % efficiency) |
-| Output Power | W | Output voltage × output current, which assumes a power factor of 1. The UPS does not report real power, so this is an upper bound |
 
 Output current and frequency need per-unit calibration values. The integration reads them
 from the UPS (registers `0x00F3`, `0x0202` and `0x0203`) when it starts and again after the
 UPS has stopped answering. If the UPS refuses or does not answer those reads, or the
 values cannot be used (a zero divisor), Output Current and Output Frequency are
-*unavailable* rather than guessed, and so are the three values calculated from the
-current (Output Apparent Power, Output Power and Input Current). A warning in the log
-says which read failed, and reloading the integration tries again.
+*unavailable* rather than guessed, and so are the values calculated from the current:
+Output Apparent Power, Input Current and, on models without a rated power, Output
+Power. A warning in the log says which read failed, and reloading the integration tries
+again.
 
 Supervise shows twice the output current that owners measure. A clamp meter and a
 known-load sweep on two One UP Nitro 2000 units, and a metering plug on an NEP 1200,
 all read half of the Supervise figure, so the integration publishes that half. Other
 models use the same rule untested.
+
+#### Watts, volt-amperes and power factor
+
+A 2000 VA unit is rated 1400 W. That datasheet power factor of 0.7 is the limit of what
+the UPS can deliver, not the power factor of the equipment plugged into it, so it cannot
+turn a reading in VA into watts.
+
+The UPS reports two things about its output: voltage and current, whose product is the
+apparent power (VA), and a load percentage, which Supervise and the front panel show as
+"Potência (%)". For the One UP Nitro 2000, an owner reports that Ragtech describes that
+percentage as the share of the rated 1400 W in use, and that owner's clamp-meter
+readings agree with it, so the integration publishes it as Output Power. Output Power ÷
+Output Apparent Power is
+then the power factor of the connected equipment. Both readings come from one-byte
+registers, so the ratio is only meaningful averaged over time. If Output Power stays
+above Output Apparent Power, the current calibration does not fit that unit.
+
+For the other models it is not known what the load percentage refers to, so their
+Output Power remains voltage × current.
 
 #### Binary sensors
 
@@ -182,9 +202,11 @@ Decoding now follows Ragtech's own register map, so several values change:
 - Input Frequency became Output Frequency, which is what the UPS measures, and is scaled
   with the unit's calibration registers. An existing entity keeps its entity id and
   history.
-- Output Apparent Power is voltage × current; it used to be 1.3 times that. Output Power
-  keeps its formula (voltage × current) and is now documented as an upper bound, because
-  the UPS reports no power factor.
+- Output Apparent Power is voltage × current; it used to be 1.3 times that, a factor with
+  no measurement behind it.
+- Output Power on the One UP 2000 Nitro TI is the UPS's load figure × its rated 1400 W.
+  On other models it keeps its formula (voltage × current) and is now documented as an
+  upper bound.
 - The Easy Pro (code `6`) reads input voltage from the same register as every other
   model.
 - All 20 models of the family are supported, and the start byte of "Save Digital" units

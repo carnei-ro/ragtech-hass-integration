@@ -154,6 +154,12 @@ def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
                 (output_voltage * output_current) / (input_voltage * efficiency), 2
             )
 
+    # Ragtech describes the load as the share of the rated watts in use. Without
+    # a rating, the volt-amperes stand in: an upper bound.
+    power = apparent_power
+    if profile.rated_power:
+        power = round(values["load"] * profile.rated_power / 100, 1)
+
     flags = decode_flags(data)
 
     return {
@@ -165,8 +171,7 @@ def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
         "output.voltage": output_voltage,
         "output.frequency": _round(values["output_frequency"], 2),
         "output.current": output_current,
-        # The UPS reports no power factor: the watts assume 1, an upper bound.
-        "output.power": apparent_power,
+        "output.power": power,
         "output.apower": apparent_power,
         "ups.temperature": values["temperature"],
         "ups.load": values["load"],

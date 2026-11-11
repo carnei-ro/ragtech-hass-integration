@@ -20,7 +20,6 @@ CALIBRATED_KEYS = (
     "input.current",
     "output.frequency",
     "output.current",
-    "output.power",
     "output.apower",
 )
 
@@ -67,6 +66,8 @@ def test_table_holds_the_twenty_family_10_models():
         assert model.output_voltage_scale == (1.03 if code % 2 else 0.555)
     for codes, factors in CURRENT_FACTORS.items():
         assert tuple(models[code].output_current_factor for code in codes) == factors
+    rated = {code: model.rated_power for code, model in models.items()}
+    assert {code: watts for code, watts in rated.items() if watts} == {16: 1400}
 
 
 def test_stored_model_keys_still_select_codes_6_and_16():
@@ -105,14 +106,25 @@ def test_current_and_frequency_need_the_calibration_registers():
     assert data["output.frequency"] == 60.02
 
 
-def test_both_power_values_are_volts_times_amps():
+def test_power_is_the_load_share_of_the_rated_watts():
     data = parse_data(
         POST_SWAP.frame, MODEL_ONE_UP_2000_NITRO_TI, Calibration(*CALIBRATION)
     )
     assert (data["output.voltage"], data["output.current"]) == (110, 1.62)
     assert data["output.apower"] == 178.2
-    # Watts can never exceed volt-amperes: without a power factor they equal them.
-    assert data["output.power"] == 178.2
+    assert (data["ups.load"], NITRO_TI.rated_power) == (11, 1400)
+    assert data["output.power"] == 154.0
+    # The load register needs no calibration.
+    assert (
+        parse_data(POST_SWAP.frame, MODEL_ONE_UP_2000_NITRO_TI)["output.power"] == 154.0
+    )
+
+
+def test_power_is_volts_times_amps_without_a_rated_power():
+    assert UPS_MODELS[MODEL_EASY_PRO].rated_power is None
+    data = parse_data(POST_SWAP.frame, MODEL_EASY_PRO, Calibration(*CALIBRATION))
+    assert data["output.power"] == data["output.apower"] == 71.5
+    assert parse_data(POST_SWAP.frame, MODEL_EASY_PRO)["output.power"] is None
 
 
 @pytest.mark.parametrize("current", [None, 0])

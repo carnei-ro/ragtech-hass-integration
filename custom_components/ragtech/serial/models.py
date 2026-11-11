@@ -22,6 +22,8 @@ class UpsModel(NamedTuple):
     # Amps per count of register 0x8C, before dividing by the unit's
     # calibration register 0x00F3.
     output_current_factor: float
+    # Watts at 100 % load, where the load register is known to refer to them.
+    rated_power: int | None = None
 
 
 _FAMILY_10 = (
@@ -43,8 +45,9 @@ _FAMILY_10 = (
     UpsModel(13, "1600 VA M2", 0.134, 1.03, 6.8),
     UpsModel(14, "1800 VA TI", 0.134, 0.555, 14.4),
     UpsModel(15, "1800 VA M2", 0.134, 1.03, 7.65),
-    # 2000 VA TI; the NitroUp 2000 and Easy 2000 TI report this code too.
-    UpsModel(16, "One UP 2000 Nitro TI", 0.134, 0.555, 15.93),
+    # 2000 VA TI, rated 1400 W; the NitroUp 2000 and Easy 2000 TI report this
+    # code too.
+    UpsModel(16, "One UP 2000 Nitro TI", 0.134, 0.555, 15.93, 1400),
     UpsModel(17, "2000 VA M2", 0.134, 1.03, 8.52),
     UpsModel(18, "2200 VA TI", 0.134, 0.555, 17.52),
     UpsModel(19, "2200 VA M2", 0.134, 1.03, 9.37),
