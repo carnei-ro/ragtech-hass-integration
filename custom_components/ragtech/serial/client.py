@@ -67,6 +67,8 @@ class RagtechSerialClient:
         self.timeout = timeout
         self.model = model
         self.last_data = None
+        # Hex of the latest reply to the status request, valid or not.
+        self.last_frame = None
 
     def get_status(self):
         try:
@@ -78,7 +80,8 @@ class RagtechSerialClient:
                     self.model,
                 )
                 response = _request_status(ser)
-                _LOGGER.debug("[get_status] frame: %s", response.hex())
+                self.last_frame = response.hex()
+                _LOGGER.debug("[get_status] frame: %s", self.last_frame)
 
                 parsed = parse_data(response, self.model)
                 if parsed:

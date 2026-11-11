@@ -202,11 +202,13 @@ def test_get_status_reads_one_31_byte_frame(fake_serial, model):
     assert port.calls == EXPECTED_CALLS
 
 
-def test_get_status_logs_the_raw_frame(fake_serial, caplog):
+def test_get_status_logs_and_keeps_the_raw_frame(fake_serial, caplog):
     fake_serial(FRAME)
     caplog.set_level(logging.DEBUG)
-    client.RagtechSerialClient("/dev/null", 2560, 5).get_status()
+    ups = client.RagtechSerialClient("/dev/null", 2560, 5)
+    ups.get_status()
     assert f"frame: {FRAME.hex()}" in caplog.text
+    assert ups.last_frame == FRAME.hex()
 
 
 @pytest.mark.parametrize(
