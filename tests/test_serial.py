@@ -9,6 +9,7 @@ from custom_components.ragtech.serial.models import (
     UPS_MODELS,
 )
 from custom_components.ragtech.serial.parser import detect_model, parse_data
+from vendor_frames import FRAMES, POST_SWAP, PRE_SWAP
 
 # Senoidal Puro 1200VA, mains OK (issue #27): byte 1 = 0x09, model code 6.
 SENOIDAL_FRAMES = [
@@ -75,6 +76,38 @@ def test_real_frames_decode_whatever_byte_1_holds(frame, model):
 def test_known_values(frame, model, expected):
     data = parse_data(frame, model)
     assert tuple(data[key] for key in DECODED_KEYS) == expected
+
+
+def test_pre_swap_frame_asks_for_a_battery_replacement():
+    data = parse_data(PRE_SWAP.frame, NITRO_TI)
+    assert data["battery.aged"]
+    assert data["battery.capacity_reduced"]
+    assert data["ups.status"] == "OL RB"
+    assert data["battery.status"] == "FULL"
+
+
+def test_post_swap_frame_is_healthy_and_still_charging():
+    data = parse_data(POST_SWAP.frame, NITRO_TI)
+    assert not data["battery.aged"]
+    assert not data["battery.capacity_reduced"]
+    assert data["ups.status"] == "OL"
+    assert data["battery.status"] == "CHARGING"
+
+
+def test_on_battery_frame_is_discharging():
+    on_battery = FRAMES[11]
+    data = parse_data(on_battery.frame, NITRO_TI)
+    assert data["ups.on_battery"]
+    assert data["input.absent"]
+    assert data["ups.status"] == "OB"
+    assert data["battery.status"] == "DISCHARGING"
+
+
+def test_input_above_output_does_not_mean_charging():
+    data = parse_data(with_byte(POST_SWAP.frame, 8, 0xFF), NITRO_TI)
+    assert data["input.voltage"] > data["output.voltage"]
+    assert data["ups.status"] == "OL"
+    assert data["battery.status"] == "FULL"
 
 
 @pytest.mark.parametrize(("code", "model"), [(6, MODEL_EASY_PRO), (16, NITRO_TI)])

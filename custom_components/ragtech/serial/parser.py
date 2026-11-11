@@ -1,16 +1,9 @@
 import logging
 
+from .flags import battery_status, decode_flags, ups_status
 from .models import MODEL_EASY_PRO, UPS_MODELS
 
 _LOGGER = logging.getLogger(__name__)
-
-# Below this input voltage the UPS is considered running on battery (mains down).
-ONLINE_INPUT_VOLTAGE = 100
-# Battery charge thresholds used to derive the NUT-style status.
-LOW_BATTERY_CHARGE = 30
-REPLACE_BATTERY_CHARGE = 5
-# Relative input/output voltage delta above which the battery is discharging.
-DISCHARGE_VOLTAGE_DELTA = 0.10
 
 # A status frame is a start-of-frame byte plus a register dump: byte N holds
 # register 0x80 + N - 1, so byte 1 is data, not a header.
@@ -83,7 +76,7 @@ def parse_data(data, model=MODEL_EASY_PRO):
     frequency = round(values["frequency"], 2)
     output_voltage = round(values["output_voltage"])
 
-    battery_status = "FULL"
+    flags = decode_flags(data)
 
     apparent_power = round(output_voltage * output_current, 1)
     # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
@@ -97,29 +90,10 @@ def parse_data(data, model=MODEL_EASY_PRO):
             (output_voltage * output_current) / (input_voltage * efficiency), 2
         )
 
-    if input_voltage < ONLINE_INPUT_VOLTAGE:
-        ups_status = "LB" if battery_charge < LOW_BATTERY_CHARGE else "OB"
-    else:
-        ups_status = "OL"
-
-    if battery_charge < REPLACE_BATTERY_CHARGE:
-        ups_status = "RB"
-
-    if input_voltage > output_voltage:
-        ups_status += " CHRG"
-        battery_status = "CHARGING"
-    elif (
-        input_voltage != 0
-        and abs(input_voltage - output_voltage) / input_voltage
-        > DISCHARGE_VOLTAGE_DELTA
-    ):
-        ups_status += " DISCHRG"
-        battery_status = "DISCHARGING"
-
     return {
         "battery.charge": battery_charge,
         "battery.voltage": battery_voltage,
-        "battery.status": battery_status,
+        "battery.status": battery_status(flags, battery_charge),
         "input.voltage": input_voltage,
         "input.current": current_in,
         "input.frequency": frequency,
@@ -129,5 +103,6 @@ def parse_data(data, model=MODEL_EASY_PRO):
         "output.apower": real_power,
         "ups.temperature": temperature,
         "ups.load": load,
-        "ups.status": ups_status,
+        "ups.status": ups_status(flags),
+        **flags,
     }
