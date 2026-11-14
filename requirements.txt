@@ -3,4 +3,4 @@ homeassistant==2026.10.4
 pip>=26.3
 pyserial==3.5
 pytest==9.2.0
-ruff==0.17.3
+ruff==0.17.4
