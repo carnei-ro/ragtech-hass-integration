@@ -4,11 +4,10 @@ from .const import DOMAIN, CONF_NAME_KEY, CONF_MODEL_KEY, CONF_MODEL_DEFAULT_VAL
 
 def get_device_info(entry):
     merged = {**entry.data, **(entry.options or {})}
-    model_key = merged.get(CONF_MODEL_KEY, CONF_MODEL_DEFAULT_VALUE)
-    model_label = UPS_MODELS.get(model_key, {}).get("label", "UPS")
+    model = UPS_MODELS.get(merged.get(CONF_MODEL_KEY, CONF_MODEL_DEFAULT_VALUE))
     return {
         "identifiers": {(DOMAIN, entry.entry_id)},
         "name": entry.data.get(CONF_NAME_KEY),
         "manufacturer": "Ragtech",
-        "model": model_label,
+        "model": model.label if model else "UPS",
     }

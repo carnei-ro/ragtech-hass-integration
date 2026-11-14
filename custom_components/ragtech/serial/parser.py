@@ -1,113 +1,187 @@
 import logging
+from typing import NamedTuple
 
+from .flags import FULL_CHARGE, battery_status, decode_flags, ups_status
 from .models import MODEL_EASY_PRO, UPS_MODELS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Below this input voltage the UPS is considered running on battery (mains down).
-ONLINE_INPUT_VOLTAGE = 100
-# Battery charge thresholds used to derive the NUT-style status.
-LOW_BATTERY_CHARGE = 30
-REPLACE_BATTERY_CHARGE = 5
-# Relative input/output voltage delta above which the battery is discharging.
-DISCHARGE_VOLTAGE_DELTA = 0.10
+# A status frame is a start byte plus a register dump: byte N holds register
+# 0x80 + N - 1, so byte 1 is data, not a header.
+FRAME_LENGTH = 31
+# Requests and replies start with 0xA0 | family. Families 10 ("Easy") and 13
+# ("Save Digital") share this protocol and register map.
+START = 0xA0
+FAMILIES = (10, 13)
+# A lone 0xC0 | family byte refuses the request.
+REFUSAL = 0xC0
 
-# Fields whose raw values are (byte_offset, multiplier, additive_offset)
-# lookups inside a model profile.
-_METRIC_FIELDS = (
-    "battery_charge",
-    "battery_voltage",
-    "input_voltage",
-    "output_current",
-    "load",
-    "temperature",
-    "frequency",
-    "output_voltage",
-)
+# Status frame bytes the parser reads.
+NONVOLATILE_FLAGS = 1  # register 0x80
+SETTINGS = slice(1, 8)  # registers 0x80-0x86
+CAPACITY_REFERENCE = 4  # register 0x83
+BATTERY_CHARGE = 8  # register 0x87
+BATTERY_VOLTAGE = 11  # register 0x8A
+INPUT_VOLTAGE = 12  # register 0x8B
+OUTPUT_CURRENT = 13  # register 0x8C
+LOAD = 14  # register 0x8D
+TEMPERATURE = 15  # register 0x8E
+OUTPUT_FREQUENCY = 24  # register 0x97, the inverter oscillator count
+MODEL_CODE = 27  # register 0x9A
+FIRMWARE = 28  # register 0x9B, in tenths
+OUTPUT_VOLTAGE = 30  # register 0x9D
+
+# Scales every model shares.
+BATTERY_CHARGE_SCALE = 0.393
+INPUT_VOLTAGE_SCALE = 1.06
+# Ragtech's software divides the current by the calibration register alone.
+# Owners' meters on three units (model codes 6 and 16) read half of that.
+CURRENT_CALIBRATION_FACTOR = 2
 
 
-def _read(hex_str, spec):
-    offset, multiplier, additive = spec
-    raw = int(hex_str[offset * 2 : offset * 2 + 2], 16)
-    return raw * multiplier + additive
+class Calibration(NamedTuple):
+    """Per-unit calibration registers; None where the UPS provided no value."""
+
+    current: int | None = None  # register 0x00F3
+    osc53: int | None = None  # register 0x0202
+    osc57: int | None = None  # register 0x0203
 
 
-def parse_data(data, model=MODEL_EASY_PRO):
+NO_CALIBRATION = Calibration()
+
+
+def reply_family(data):
+    """Return the family of the UPS that sent a reply, or None if it is not one."""
+    if data and data[0] & 0xF0 == START and data[0] & 0x0F in FAMILIES:
+        return data[0] & 0x0F
+    return None
+
+
+def is_frame(data):
+    return len(data) >= FRAME_LENGTH and reply_family(data) is not None
+
+
+def is_refusal(data):
+    return len(data) == 1 and data[0] & 0xF0 == REFUSAL
+
+
+def detect_model(data):
+    """Return the model key for a status frame, or None if unrecognised."""
+    if not is_frame(data):
+        return None
+    for key, model in UPS_MODELS.items():
+        if data[MODEL_CODE] == model.code:
+            return key
+    return None
+
+
+def _output_current(raw, model, calibration):
+    # Without the unit's calibration byte the reading has no scale.
+    if not calibration.current:
+        return None
+    return (
+        raw
+        * model.output_current_factor
+        / (CURRENT_CALIBRATION_FACTOR * calibration.current)
+    )
+
+
+def _output_frequency(raw, calibration):
+    # The oscillator count is interpolated between its 53 Hz and 57 Hz marks.
+    osc53, osc57 = calibration.osc53, calibration.osc57
+    if osc53 is None or osc57 is None or osc53 == osc57:
+        return None
+    return (53 + 4 * (raw - osc53) / (osc57 - osc53)) * 0.9806 + 1.46
+
+
+def decode_frame(data, model, calibration=NO_CALIBRATION):
+    """Scale the registers of a status frame the way Ragtech's software does."""
+    return {
+        "battery_charge": min(data[BATTERY_CHARGE] * BATTERY_CHARGE_SCALE, FULL_CHARGE),
+        "battery_voltage": data[BATTERY_VOLTAGE] * model.battery_voltage_scale,
+        "input_voltage": data[INPUT_VOLTAGE] * INPUT_VOLTAGE_SCALE,
+        "output_voltage": data[OUTPUT_VOLTAGE] * model.output_voltage_scale,
+        "output_current": _output_current(data[OUTPUT_CURRENT], model, calibration),
+        "output_frequency": _output_frequency(data[OUTPUT_FREQUENCY], calibration),
+        "load": data[LOAD],
+        "temperature": data[TEMPERATURE],
+    }
+
+
+def _round(value, digits):
+    return None if value is None else round(value, digits)
+
+
+def parse_data(data, model=MODEL_EASY_PRO, calibration=NO_CALIBRATION):
     """
     Parse a raw serial response from a Ragtech UPS.
 
-    `model` selects which calibration profile in ``UPS_MODELS`` to use.
+    `model` is the key of the ``UPS_MODELS`` row to decode with. Output current
+    and frequency, and the values derived from them, are None when
+    `calibration` lacks the registers they need.
     """
     profile = UPS_MODELS.get(model)
     if profile is None:
         _LOGGER.debug("[parse_data] unknown model: %s", model)
         return None
 
-    hex_str = "".join(f"{byte:02x}" for byte in data)
-    # The UPS may deliver fewer bytes than ``response_length`` before the read
-    # timeout expires, so only require the bytes up to the last metric we read.
-    min_hex_len = max(profile[field][0] for field in _METRIC_FIELDS) * 2 + 2
-
-    if not (hex_str.startswith(profile["header"]) and len(hex_str) >= min_hex_len):
-        _LOGGER.debug("[parse_data] unexpected response: %s", hex_str)
+    if is_refusal(data):
+        _LOGGER.debug(
+            "[parse_data] the UPS (family %d) refused the request: %s",
+            data[0] & 0x0F,
+            data.hex(),
+        )
         return None
 
-    values = {field: _read(hex_str, profile[field]) for field in _METRIC_FIELDS}
+    if not is_frame(data):
+        _LOGGER.debug("[parse_data] unexpected response: %s", data.hex())
+        return None
 
+    values = decode_frame(data, profile, calibration)
     battery_charge = round(values["battery_charge"])
-    battery_voltage = round(values["battery_voltage"], 2)
     input_voltage = round(values["input_voltage"])
-    output_current = round(values["output_current"], 2)
-    load = round(values["load"])
-    temperature = round(values["temperature"])
-    frequency = round(values["frequency"], 2)
     output_voltage = round(values["output_voltage"])
+    output_current = _round(values["output_current"], 2)
 
-    battery_status = "FULL"
+    apparent_power = current_in = None
+    if output_current is not None:
+        apparent_power = round(output_voltage * output_current, 1)
+        # Efficiency factor derived from multimeter readings and the official app.
+        efficiency = 0.60
+        current_in = 0.0
+        if input_voltage > 0:
+            current_in = round(
+                (output_voltage * output_current) / (input_voltage * efficiency), 2
+            )
 
-    apparent_power = round(output_voltage * output_current, 1)
-    # Power factor of 0.7 -> 1.3 multiplier is used for the real power estimate.
-    power_factor = 1.3
-    real_power = round(apparent_power * power_factor, 1)
-    # Efficiency factor derived from multimeter readings and the official app.
-    efficiency = 0.60
-    current_in = 0.0
-    if input_voltage > 0:
-        current_in = round(
-            (output_voltage * output_current) / (input_voltage * efficiency), 2
-        )
+    # Ragtech describes the load as the share of the rated watts in use. Without
+    # a rating, the volt-amperes stand in: an upper bound.
+    power = apparent_power
+    if profile.rated_power:
+        power = round(values["load"] * profile.rated_power / 100, 1)
 
-    if input_voltage < ONLINE_INPUT_VOLTAGE:
-        ups_status = "LB" if battery_charge < LOW_BATTERY_CHARGE else "OB"
-    else:
-        ups_status = "OL"
-
-    if battery_charge < REPLACE_BATTERY_CHARGE:
-        ups_status = "RB"
-
-    if input_voltage > output_voltage:
-        ups_status += " CHRG"
-        battery_status = "CHARGING"
-    elif (
-        input_voltage != 0
-        and abs(input_voltage - output_voltage) / input_voltage
-        > DISCHARGE_VOLTAGE_DELTA
-    ):
-        ups_status += " DISCHRG"
-        battery_status = "DISCHARGING"
+    flags = decode_flags(data)
 
     return {
         "battery.charge": battery_charge,
-        "battery.voltage": battery_voltage,
-        "battery.status": battery_status,
+        "battery.voltage": round(values["battery_voltage"], 2),
+        "battery.status": battery_status(flags, battery_charge),
         "input.voltage": input_voltage,
         "input.current": current_in,
-        "input.frequency": frequency,
         "output.voltage": output_voltage,
+        "output.frequency": _round(values["output_frequency"], 2),
         "output.current": output_current,
-        "output.power": apparent_power,
-        "output.apower": real_power,
-        "ups.temperature": temperature,
-        "ups.load": load,
-        "ups.status": ups_status,
+        "output.power": power,
+        "output.apower": apparent_power,
+        "ups.temperature": values["temperature"],
+        "ups.load": values["load"],
+        "ups.status": ups_status(flags),
+        "ups.model_code": data[MODEL_CODE],
+        "ups.firmware": f"{data[FIRMWARE] / 10:.1f}",
+        "battery.capacity_reference": data[CAPACITY_REFERENCE],
+        # Raw registers, published as they are: bits 3 and 5 of 0x80 have no
+        # known meaning and must not be interpreted.
+        "ups.register_80": f"0x{data[NONVOLATILE_FLAGS]:02X}",
+        "ups.settings": data[SETTINGS].hex(" ").upper(),
+        **flags,
     }
